@@ -1,0 +1,12 @@
+{
+    "manifest_version": 3,
+    "name": "Hebrew Audio Transcription",
+    "version": "1.0",
+    "description": "תמלול קבצי אודיו בעברית",
+    "permissions": [
+      "activeTab"
+    ],
+    "action": {
+      "default_popup": "popup.html"
+    }
+  }

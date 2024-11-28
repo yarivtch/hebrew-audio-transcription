@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            width: 400px;
+            padding: 20px;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .dropzone {
+            border: 2px dashed #ccc;
+            border-radius: 4px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.3s ease;
+        }
+        .dropzone:hover {
+            border-color: #666;
+        }
+        .dropzone.drag-over {
+            border-color: #2196F3;
+            background-color: #E3F2FD;
+        }
+        .transcription {
+            margin-top: 15px;
+            padding: 10px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 10px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #1976D2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>תמלול אודיו בעברית</h2>
+        
+        <div id="dropzone" class="dropzone">
+            גרור קובץ אודיו לכאן או לחץ לבחירה
+            <input type="file" id="fileInput" style="display: none" accept="audio/*">
+        </div>
+        
+        <button id="transcribeBtn" style="display: none">תמלל</button>
+        
+        <div id="loading" class="loading">
+            מתמלל... אנא המתן
+        </div>
+        
+        <div id="result" class="transcription" style="display: none"></div>
+    </div>
+    
+    <script src="popup.js"></script>
+</body>
+</html>

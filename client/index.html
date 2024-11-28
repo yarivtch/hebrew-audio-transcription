@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מערכת תמלול אודיו</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>מערכת תמלול אודיו</h1>
+        <div id="drop-area">
+            <form class="my-form">
+                <p>גרור קובץ אודיו לכאן או לחץ לבחירת קובץ</p>
+                <input type="file" id="fileElem" accept="audio/*">
+                <label class="button" for="fileElem">בחר קובץ</label>
+            </form>
+        </div>
+        <div id="selected-file"></div>
+        <div id="transcribe-container">
+            <button id="transcribe-btn">תמלל</button>
+            <div id="loading-animation" class="lds-ellipsis" style="display: none;">
+                <div></div><div></div><div></div><div></div>
+            </div>
+        </div>
+        <div id="transcription-area" class="transcription-area">
+            <h2>תוצאת התמלול:</h2>
+            <p id="transcription-text">אין תמלול עדיין</p>
+        </div>
+    </div>
+    <script src="scripts.js"></script>
+</body>
+</html>
