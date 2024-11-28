@@ -1,7 +1,16 @@
-// Dynamic transcription endpoint based on hostname
-const TRANSCRIPTION_ENDPOINT = window.location.hostname === 'localhost' 
-    ? 'http://localhost:5001/transcribe' 
-    : 'https://hebrew-audio-transcription.onrender.com/transcribe';
+// Determine transcription endpoint dynamically
+const TRANSCRIPTION_ENDPOINT = (() => {
+    const hostname = window.location.hostname;
+    const port = window.location.port;
+    
+    // Local development
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return `http://localhost:${port || 5001}/transcribe`;
+    }
+    
+    // Production (Render) or other hosted environments
+    return '/transcribe';
+})();
 
 console.log('Transcription Endpoint:', TRANSCRIPTION_ENDPOINT);
 
@@ -81,94 +90,36 @@ transcribeBtn.addEventListener('click', async () => {
         size: selectedFile.size
     });
 
-    // Create FormData with multiple possible keys
-    const formDataConfigs = [
-        { key: 'file', data: new FormData() },
-        { key: 'audio', data: new FormData() },
-        { key: 'audioFile', data: new FormData() }
-    ];
-
-    // Append file to each configuration
-    formDataConfigs.forEach(config => {
-        config.data.append(config.key, selectedFile);
-        
-        // Log FormData contents for debugging
-        console.log(`FormData Configuration - Key: ${config.key}`);
-        for (let [key, value] of config.data.entries()) {
-            console.log(`  Entry - Key: ${key}, Value:`, value);
-        }
-    });
+    // Create FormData
+    const formData = new FormData();
+    formData.append('file', selectedFile);
 
     try {
-        for (const config of formDataConfigs) {
-            console.log(`🔍 Attempting upload with key: ${config.key}`);
+        console.log('Sending request to:', TRANSCRIPTION_ENDPOINT);
+        console.log('File:', selectedFile.name);
 
-            transcribeBtn.disabled = true;
-            loadingAnimation.style.display = 'inline-block';
-            transcriptionText.textContent = '';
+        transcribeBtn.disabled = true;
+        loadingAnimation.style.display = 'inline-block';
+        transcriptionText.textContent = '';
 
-            try {
-                console.time(`Upload with ${config.key}`);
-                const response = await fetch(TRANSCRIPTION_ENDPOINT, {
-                    method: 'POST',
-                    body: config.data,
-                    headers: {
-                        // Optional: explicitly set content type
-                        // Note: Don't set Content-Type for FormData, browser will set it automatically
-                    }
-                });
-                console.timeEnd(`Upload with ${config.key}`);
+        const response = await fetch(TRANSCRIPTION_ENDPOINT, {
+            method: 'POST',
+            body: formData
+        });
 
-                console.log('Response Details:', {
-                    status: response.status,
-                    statusText: response.statusText,
-                    headers: Object.fromEntries(response.headers.entries())
-                });
+        console.log('Response status:', response.status);
+        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
-                // Check response status and content
-                if (response.ok) {
-                    try {
-                        const data = await response.json();
-                        console.log('Transcription Response:', data);
-                        
-                        // Validate transcription data
-                        if (data.transcription) {
-                            transcriptionText.textContent = data.transcription;
-                            console.groupEnd();
-                            return; // Successful transcription, exit function
-                        } else {
-                            throw new Error('תגובה לא תקינה: לא התקבל טקסט תמלול');
-                        }
-                    } catch (parseError) {
-                        console.error('JSON Parsing Error:', parseError);
-                        const errorText = await response.text();
-                        console.error('Raw Response:', errorText);
-                        throw new Error(`שגיאה בפענוח התגובה: ${parseError.message}`);
-                    }
-                } else {
-                    // Handle error response
-                    const errorText = await response.text();
-                    console.error(`Error with key ${config.key}:`, errorText);
-                    
-                    // Try to parse error JSON if possible
-                    try {
-                        const errorData = JSON.parse(errorText);
-                        throw new Error(errorData.error || 'שגיאה בלתי צפויה');
-                    } catch {
-                        throw new Error(errorText || 'שגיאה בהעלאת הקובץ');
-                    }
-                }
-            } catch (innerError) {
-                console.error(`Error with key ${config.key}:`, innerError);
-                // Continue to next configuration if this one fails
-                continue;
-            }
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Error response:', errorText);
+            throw new Error(`שגיאה בביצוע התמלול: ${errorText}`);
         }
 
-        // If all attempts fail
-        throw new Error('כל ניסיונות ההעלאה נכשלו');
+        const data = await response.json();
+        transcriptionText.textContent = data.transcription || 'לא התקבל טקסט';
     } catch (error) {
-        console.error('Full Upload Error:', error);
+        console.error('Full error:', error);
         transcriptionText.textContent = `שגיאה: ${error.message}`;
     } finally {
         transcribeBtn.disabled = false;
