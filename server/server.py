@@ -24,7 +24,7 @@ UPLOADS_DIR = os.path.join('/opt/render/project/uploads')
 # Ensure uploads directory exists
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 
-app = Flask(__name__, static_folder=CLIENT_DIR)
+app = Flask(__name__, static_folder='../client', static_url_path='/')
 CORS(app, resources={
     r"/transcribe": {
         "origins": ["*"],
@@ -44,6 +44,7 @@ def get_whisper_model():
         except Exception as e:
             logger.error(f"Model loading error: {e}")
             _model = None
+            
     return _model
 
 # Health check route
@@ -340,12 +341,13 @@ def transcribe():
         }), 500
 
 @app.route('/')
-def index():
-    return send_from_directory(CLIENT_DIR, 'index.html')
+def serve_client():
+    return send_from_directory(app.static_folder, 'index.html')
 
+# Catch-all route to serve static files
 @app.route('/<path:path>')
-def static_files(path):
-    return send_from_directory(CLIENT_DIR, path)
+def serve_static(path):
+    return send_from_directory(app.static_folder, path)
 
 # Adjust host for production
 if __name__ == '__main__':
