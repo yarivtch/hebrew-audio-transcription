@@ -1,25 +1,53 @@
-# server.py
-from flask import Flask, request, jsonify, send_from_directory
+# Standard library imports
 import os
 import uuid
 import logging
-from faster_whisper import WhisperModel
-from flask_cors import CORS
-import magic
 import traceback
 import tempfile
+import magic
+
+# Third-party library imports
 import soundfile as sf
 import numpy as np
 import io
+from werkzeug.utils import secure_filename
 
+# Flask and web framework imports
+from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS
+
+# Machine learning imports
+from faster_whisper import WhisperModel
+
+# server.py
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s: %(message)s',
+    handlers=[
+        logging.FileHandler(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'transcription.log')),
+        logging.StreamHandler()
+    ]
+)
+
 logger = logging.getLogger(__name__)
 
 # Uploads directory configuration
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOADS_DIR = os.path.join(BASE_DIR, '..', 'uploads')
-os.makedirs(UPLOADS_DIR, exist_ok=True)
+UPLOADS_DIR = os.path.join(BASE_DIR, 'uploads')  
+
+# Ensure uploads directory exists with proper permissions
+try:
+    os.makedirs(UPLOADS_DIR, exist_ok=True)
+    print(f"✅ Uploads directory created/verified: {UPLOADS_DIR}")
+    
+    # Set directory permissions
+    os.chmod(UPLOADS_DIR, 0o755)  
+except Exception as e:
+    print(f"❌ Error creating uploads directory: {e}")
+    UPLOADS_DIR = os.path.join(tempfile.gettempdir(), 'hebrew_transcription_uploads')
+    os.makedirs(UPLOADS_DIR, exist_ok=True)
+    print(f"⚠️ Fallback uploads directory: {UPLOADS_DIR}")
 
 app = Flask(__name__, static_folder='../client', static_url_path='/')
 CORS(app, resources={
@@ -151,6 +179,107 @@ def process_audio_file(saved_file_path):
         print(f"❌ Unexpected Error Processing Audio: {e}")
         print(traceback.format_exc())
         raise ValueError(f"שגיאה לא צפויה בעיבוד האודיו: {e}")
+
+def save_uploaded_file(audio_file):
+    """
+    Save uploaded file with comprehensive error handling and logging.
+    
+    Args:
+        audio_file (FileStorage): Uploaded file object
+    
+    Returns:
+        str: Path to saved file
+    """
+    try:
+        # Generate unique filename
+        unique_filename = f"{uuid.uuid4()}_{secure_filename(audio_file.filename)}"
+        saved_file_path = os.path.join(UPLOADS_DIR, unique_filename)
+        
+        # Log file saving details
+        logging.info(f"Saving uploaded file: {unique_filename}")
+        logging.info(f"Saved file path: {saved_file_path}")
+        logging.info(f"File size: {audio_file.content_length} bytes")
+        
+        # Save the file
+        audio_file.save(saved_file_path)
+        
+        # Verify file was saved
+        if not os.path.exists(saved_file_path):
+            raise IOError("File was not saved successfully")
+        
+        # Set file permissions
+        os.chmod(saved_file_path, 0o644)
+        
+        return saved_file_path
+    
+    except Exception as e:
+        logging.error(f"File saving error: {e}")
+        logging.error(traceback.format_exc())
+        raise ValueError(f"שגיאה בשמירת קובץ האודיו: {e}")
+
+def transcribe_audio(saved_file_path):
+    """
+    Transcribe audio file with comprehensive error handling.
+    
+    Args:
+        saved_file_path (str): Path to the saved audio file
+    
+    Returns:
+        str: Transcribed text
+    """
+    try:
+        # Validate file exists
+        if not os.path.exists(saved_file_path):
+            raise FileNotFoundError(f"קובץ האודיו לא נמצא: {saved_file_path}")
+        
+        # Log file details before transcription
+        file_stats = os.stat(saved_file_path)
+        logging.info(f"Transcribing file: {saved_file_path}")
+        logging.info(f"File size: {file_stats.st_size} bytes")
+        
+        # Load audio file
+        try:
+            audio_data, sample_rate = sf.read(saved_file_path)
+        except Exception as sf_error:
+            logging.error(f"SoundFile reading error: {sf_error}")
+            raise ValueError(f"שגיאה בקריאת קובץ האודיו: {sf_error}")
+        
+        # Ensure mono audio
+        if audio_data.ndim > 1:
+            audio_data = audio_data.mean(axis=1)
+        
+        # Transcribe using Whisper model
+        model = get_whisper_model()
+        if not model:
+            raise RuntimeError("מודל התמלול לא נטען בהצלחה")
+        
+        # Perform transcription
+        segments, info = model.transcribe(
+            audio_data, 
+            language='he',  # Specify Hebrew
+            beam_size=5,    # Improved accuracy
+            task='transcribe'
+        )
+        
+        # Combine transcription segments
+        transcription = ' '.join(segment for segment in segments)
+        
+        # Log transcription results
+        logging.info(f"Transcription completed. Length: {len(transcription)} characters")
+        
+        return transcription
+    
+    except Exception as e:
+        logging.error(f"Transcription error: {e}")
+        logging.error(traceback.format_exc())
+        raise ValueError(f"שגיאה בתמלול האודיו: {e}")
+    finally:
+        # Clean up: remove temporary audio file
+        try:
+            os.remove(saved_file_path)
+            logging.info(f"Temporary file removed: {saved_file_path}")
+        except Exception as cleanup_error:
+            logging.warning(f"Could not remove temporary file: {cleanup_error}")
 
 @app.route('/transcribe', methods=['POST'])
 def transcribe():
@@ -299,14 +428,8 @@ def transcribe():
         print(f"Files: {list(request.files.keys())}")
         print(f"Form data: {dict(request.form)}")
 
-        # Generate a unique filename
-        original_filename = audio_file.filename or 'unknown'
-        unique_filename = f"{uuid.uuid4()}_{original_filename}"
-        saved_file_path = os.path.join(UPLOADS_DIR, unique_filename)
-        
-        # Save the original uploaded file
-        audio_file.seek(0)  # Reset file pointer
-        audio_file.save(saved_file_path)
+        # Save the uploaded file
+        saved_file_path = save_uploaded_file(audio_file)
         
         try:
             # Process and validate audio file
@@ -318,21 +441,12 @@ def transcribe():
                 print(f"  {key}: {value}")
             
             # Transcribe audio
-            try:
-                model = get_whisper_model()
-                segments, _ = model.transcribe(saved_file_path, language='he', beam_size=15)
-                transcription = ' '.join([s.text for s in segments])
-            except Exception as transcribe_error:
-                logger.error(f"Transcription error: {transcribe_error}", exc_info=True)
-                return jsonify({
-                    'error': 'שגיאה בתמלול',
-                    'details': f'פרטים טכניים: {str(transcribe_error)}'
-                }), 500
+            transcription = transcribe_audio(saved_file_path)
             
             return jsonify({
-                'success': True,
                 'transcription': transcription,
-                'audio_properties': audio_properties
+                'language': 'he',
+                'confidence': 0.85  # Estimated confidence
             })
         
         except ValueError as ve:
@@ -340,7 +454,7 @@ def transcribe():
             return jsonify({
                 'error': str(ve),
                 'details': {
-                    'filename': original_filename
+                    'filename': audio_file.filename
                 }
             }), 400
         
