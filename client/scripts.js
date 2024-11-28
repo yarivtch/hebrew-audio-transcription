@@ -77,9 +77,18 @@ transcribeBtn.addEventListener('click', async () => {
     const formData = new FormData();
     formData.append('file', selectedFile);
 
+    // Log FormData contents for debugging
+    for (let [key, value] of formData.entries()) {
+        console.log(`FormData Entry - Key: ${key}, Value:`, value);
+    }
+
     try {
         console.log('Sending request to:', TRANSCRIPTION_ENDPOINT);
-        console.log('File:', selectedFile.name);
+        console.log('File Details:', {
+            name: selectedFile.name,
+            type: selectedFile.type,
+            size: selectedFile.size
+        });
 
         transcribeBtn.disabled = true;
         loadingAnimation.style.display = 'inline-block';

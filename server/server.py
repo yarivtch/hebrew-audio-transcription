@@ -155,30 +155,22 @@ def process_audio_file(saved_file_path):
 @app.route('/transcribe', methods=['POST'])
 def transcribe():
     try:
-        # EXTREME DEBUGGING
-        print("\n" + "=" * 50)
-        print("🔍 DETAILED REQUEST DEBUGGING 🔍")
-        print("=" * 50)
-        
-        # Print ALL request information
+        # Debugging: Print entire request details
+        print("\n🔍 Full Request Debug:")
         print(f"Request Method: {request.method}")
-        print(f"Request Content Type: {request.content_type}")
+        print(f"Content Type: {request.content_type}")
         print(f"Request Headers: {dict(request.headers)}")
-        
+
         # Print raw request data
-        print("\n📋 Raw Request Data:")
-        try:
-            raw_data = request.get_data(as_text=True)
-            print(f"Raw Data (first 500 chars): {raw_data[:500]}")
-        except Exception as e:
-            print(f"Error reading raw data: {e}")
-        
+        raw_data = request.get_data()
+        print(f"Raw Data Length: {len(raw_data)} bytes")
+
         # Detailed form and files information
         print("\n📂 Form and Files Information:")
         print(f"Form Keys: {list(request.form.keys())}")
         print(f"Files Keys: {list(request.files.keys())}")
         
-        # Detailed form data
+        # Log all form data
         if request.form:
             print("\n📋 Form Data:")
             for key, value in request.form.items():
@@ -198,29 +190,37 @@ def transcribe():
                     print(f"  File Size: {file_size} bytes")
                 except Exception as e:
                     print(f"  Error getting file size: {e}")
-        
+
         # Validate request method
         if request.method != 'POST':
-            print("❌ ERROR: Invalid request method")
             return jsonify({
                 'error': 'שיטת בקשה לא חוקית',
                 'details': f'שיטת בקשה: {request.method}'
             }), 405
         
-        # Check if audio file is present
-        if 'file' not in request.files:
-            print("❌ ERROR: No audio file in request")
+        # Check if any files are present
+        if not request.files:
+            print("❌ ERROR: No files in request")
             return jsonify({
                 'error': 'לא סופק קובץ אודיו',
                 'details': {
-                    'files_keys': list(request.files.keys()),
                     'content_type': request.content_type,
+                    'files_keys': list(request.files.keys()),
                     'form_keys': list(request.form.keys())
                 }
             }), 400
-        
+
+        # Get the uploaded file
         audio_file = request.files['file']
         
+        # Additional file validation
+        if not audio_file.filename:
+            print("❌ ERROR: Empty filename")
+            return jsonify({
+                'error': 'שם קובץ לא חוקי',
+                'details': 'הקובץ שנשלח אינו תקף'
+            }), 400
+
         # Comprehensive file validation
         is_valid, error_message = validate_audio_file(audio_file)
         
@@ -235,7 +235,6 @@ def transcribe():
             }), 400
         
         print(f"✅ File Validation Passed: {audio_file.filename}")
-        print("=" * 50 + "\n")
 
         # Extensive logging for debugging
         print("=" * 50)
