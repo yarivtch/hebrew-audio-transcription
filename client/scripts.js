@@ -12,7 +12,7 @@ const TRANSCRIPTION_ENDPOINT = (() => {
     return '/transcribe';
 })();
 
-console.log('Transcription Endpoint:', TRANSCRIPTION_ENDPOINT);
+console.log('🌐 Transcription Endpoint:', TRANSCRIPTION_ENDPOINT);
 
 const dropArea = document.getElementById('drop-area');
 const transcribeBtn = document.getElementById('transcribe-btn');
@@ -78,48 +78,95 @@ fileInput.addEventListener('change', function(e) {
 
 // Transcribe button click event
 transcribeBtn.addEventListener('click', async () => {
+    console.group('📤 Audio File Upload Debugging');
+    console.log('Selected File:', selectedFile);
+
     if (!selectedFile) {
+        console.warn('❌ No File Selected');
         alert('אנא בחר קובץ אודיו');
+        console.groupEnd();
         return;
     }
 
-    console.group('📤 Audio File Upload Debugging');
-    console.log('Selected File Details:', {
+    console.group('📂 File Selection');
+    console.log('Raw File Object:', selectedFile);
+    
+    // Validate file type
+    const allowedTypes = ['audio/mpeg', 'audio/wav', 'audio/mp3', 'audio/x-wav'];
+    console.log('File Details:', {
         name: selectedFile.name,
         type: selectedFile.type,
         size: selectedFile.size
     });
 
-    // Create FormData
+    if (!allowedTypes.includes(selectedFile.type)) {
+        console.warn('❌ Invalid File Type');
+        alert('אנא בחר קובץ אודיו תקף (MP3 או WAV)');
+        fileInput.value = ''; // Clear the input
+        console.groupEnd();
+        return;
+    }
+    
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (selectedFile.size > maxSize) {
+        console.warn('❌ File Too Large');
+        alert('הקובץ גדול מדי. גודל מרבי: 10MB');
+        fileInput.value = ''; // Clear the input
+        console.groupEnd();
+        return;
+    }
+    
+    console.log('✅ File Selected Successfully');
+    console.groupEnd();
+
+    console.group('🎙️ Transcription Attempt');
+    console.log('Selected File:', selectedFile);
+
+    // Create FormData with detailed logging
     const formData = new FormData();
     formData.append('file', selectedFile);
 
-    try {
-        console.log('Sending request to:', TRANSCRIPTION_ENDPOINT);
-        console.log('File:', selectedFile.name);
+    console.log('FormData Contents:');
+    for (let [key, value] of formData.entries()) {
+        console.log(`  Key: ${key}, Value:`, value);
+    }
 
+    try {
+        console.log('Sending Request to:', TRANSCRIPTION_ENDPOINT);
+        
         transcribeBtn.disabled = true;
         loadingAnimation.style.display = 'inline-block';
         transcriptionText.textContent = '';
 
-        const response = await fetch(TRANSCRIPTION_ENDPOINT, {
+        const fetchOptions = {
             method: 'POST',
             body: formData
-        });
+        };
 
-        console.log('Response status:', response.status);
-        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+        console.log('Fetch Options:', fetchOptions);
+
+        const response = await fetch(TRANSCRIPTION_ENDPOINT, fetchOptions);
+
+        console.log('Response Details:', {
+            status: response.status,
+            statusText: response.statusText,
+            headers: Object.fromEntries(response.headers.entries())
+        });
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('Error response:', errorText);
+            console.error('Error Response:', errorText);
             throw new Error(`שגיאה בביצוע התמלול: ${errorText}`);
         }
 
         const data = await response.json();
+        console.log('Transcription Response:', data);
+        
         transcriptionText.textContent = data.transcription || 'לא התקבל טקסט';
+        console.log('✅ Transcription Successful');
     } catch (error) {
-        console.error('Full error:', error);
+        console.error('❌ Full Transcription Error:', error);
         transcriptionText.textContent = `שגיאה: ${error.message}`;
     } finally {
         transcribeBtn.disabled = false;

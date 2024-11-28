@@ -352,13 +352,36 @@ def log_request_details(request):
 
 @app.route('/transcribe', methods=['POST'])
 def transcribe():
-    # Comprehensive logging of request details
-    log_request_details(request)
+    # Extremely verbose logging of request details
+    logger.info("🚀 Transcription Request Received")
+    logger.info("📋 Request Details:")
+    logger.info(f"  Method: {request.method}")
+    logger.info(f"  Content Type: {request.content_type}")
+    logger.info(f"  Content Length: {request.content_length}")
+
+    # Log all headers
+    logger.info("📨 Request Headers:")
+    for header, value in request.headers:
+        logger.info(f"  {header}: {value}")
+
+    # Log form data
+    logger.info("📝 Form Data:")
+    for key, value in request.form.items():
+        logger.info(f"  {key}: {value}")
+
+    # Log files
+    logger.info("📁 Files in Request:")
+    for key, file in request.files.items():
+        logger.info(f"  Key: {key}")
+        logger.info(f"    Filename: {file.filename}")
+        logger.info(f"    Content Type: {file.content_type}")
 
     try:
         # Check if file is present in the request
         if 'file' not in request.files and 'audio' not in request.files:
             logger.error("❌ No file uploaded")
+            logger.error(f"Available file keys: {list(request.files.keys())}")
+            logger.error(f"Available form keys: {list(request.form.keys())}")
             return jsonify({
                 'error': 'לא סופק קובץ אודיו',
                 'details': {
@@ -373,6 +396,7 @@ def transcribe():
         # Validate file presence
         if not audio_file or audio_file.filename == '':
             logger.error("❌ Empty or invalid file")
+            logger.error(f"Audio file object: {audio_file}")
             return jsonify({
                 'error': 'קובץ אודיו לא חוקי',
                 'details': {
@@ -380,6 +404,11 @@ def transcribe():
                     'content_type': audio_file.content_type if audio_file else 'None'
                 }
             }), 400
+
+        # Log file details
+        logger.info("🎧 Audio File Details:")
+        logger.info(f"  Filename: {audio_file.filename}")
+        logger.info(f"  Content Type: {audio_file.content_type}")
 
         # Validate filename
         if not audio_file.filename or len(audio_file.filename) > 255:
@@ -391,6 +420,7 @@ def transcribe():
         
         # Save the uploaded file
         saved_file_path = save_uploaded_file(audio_file)
+        logger.info(f"💾 File saved to: {saved_file_path}")
         
         try:
             # Process and validate audio file
@@ -403,6 +433,7 @@ def transcribe():
             
             # Transcribe audio
             transcription = transcribe_audio(saved_file_path)
+            logger.info(f"📝 Transcription: {transcription}")
             
             return jsonify({
                 'transcription': transcription,
@@ -413,6 +444,7 @@ def transcribe():
         except ValueError as ve:
             # Handle specific audio processing errors
             logger.error(f"❌ Audio Processing Error: {ve}")
+            logger.error(traceback.format_exc())
             return jsonify({
                 'error': str(ve),
                 'details': {
@@ -425,6 +457,7 @@ def transcribe():
             # Clean up uploaded file
             if os.path.exists(saved_file_path):
                 os.unlink(saved_file_path)
+                logger.info(f"🗑️ Deleted temporary file: {saved_file_path}")
     
     except Exception as e:
         logger.error(f"❌ Unexpected Error: {e}")
