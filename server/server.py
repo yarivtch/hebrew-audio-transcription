@@ -104,10 +104,12 @@ def transcribe_options():
 ALLOWED_MIME_TYPES = {
     'audio/mpeg',   # MP3
     'audio/wav',    # WAV
-    'audio/x-wav',  # Alternative WAV
-    'audio/mp4',    # M4A
-    'audio/ogg',    # OGG
-    'audio/webm'    # WebM audio
+    'audio/mp3',    # Alternative MP3 mime type
+    'audio/x-wav',  # Alternative WAV mime type
+    'audio/ogg',    # OGG Audio
+    'audio/webm',   # WebM Audio
+    'audio/x-m4a',  # M4A Audio
+    'audio/aac'     # AAC Audio
 }
 
 def validate_audio_file(file):
@@ -120,6 +122,45 @@ def validate_audio_file(file):
     Returns:
         Tuple (is_valid, error_message)
     """
+    # Log detailed file information
+    logger.info("🔍 Audio File Validation:")
+    logger.info(f"  Filename: {file.filename}")
+    logger.info(f"  Content Type: {file.content_type}")
+    
+    # Check if content type is allowed
+    if file.content_type not in ALLOWED_MIME_TYPES:
+        logger.warning(f"❌ Unsupported MIME Type: {file.content_type}")
+        logger.warning(f"  Allowed Types: {ALLOWED_MIME_TYPES}")
+        return False, f"סוג קובץ לא נתמך: {file.content_type}"
+    
+    # Additional validation using python-magic for more robust file type detection
+    try:
+        import magic
+        
+        # Save file temporarily to check its actual type
+        temp_path = os.path.join(app.config['UPLOAD_FOLDER'], f"temp_{uuid.uuid4()}")
+        file.save(temp_path)
+        
+        # Detect file type
+        mime = magic.Magic(mime=True)
+        detected_type = mime.from_file(temp_path)
+        
+        # Remove temporary file
+        os.unlink(temp_path)
+        
+        logger.info(f"  Detected MIME Type: {detected_type}")
+        
+        # Check if detected type is allowed
+        if detected_type not in ALLOWED_MIME_TYPES:
+            logger.warning(f"❌ Detected Unsupported MIME Type: {detected_type}")
+            return False, f"סוג קובץ לא תקף: {detected_type}"
+    
+    except ImportError:
+        logger.warning("⚠️ python-magic not installed. Skipping advanced type detection.")
+    except Exception as e:
+        logger.error(f"❌ File Type Detection Error: {e}")
+        return False, "שגיאה בזיהוי סוג הקובץ"
+    
     # Check if file exists and has a filename
     if not file or not file.filename:
         return False, 'קובץ אודיו לא חוקי: הקובץ ריק'
@@ -132,22 +173,7 @@ def validate_audio_file(file):
     if file_size > 50 * 1024 * 1024:  # 50MB
         return False, 'קובץ אודיו גדול מדי (מקסימום 50MB)'
     
-    # Detect MIME type
-    try:
-        mime = magic.Magic(mime=True)
-        mime_type = mime.from_buffer(file.read(2048))
-        file.seek(0)  # Reset file pointer
-        
-        print(f"🔍 Detected MIME Type: {mime_type}")
-        
-        if mime_type not in ALLOWED_MIME_TYPES:
-            return False, f'סוג קובץ אודיו לא נתמך: {mime_type}'
-        
-    except Exception as e:
-        print(f"❌ MIME Type Detection Error: {e}")
-        return False, 'שגיאה בזיהוי סוג הקובץ'
-    
-    return True, ''
+    return True, ""
 
 def process_audio_file(saved_file_path):
     """
@@ -416,6 +442,18 @@ def transcribe():
             return jsonify({
                 'error': 'שם קובץ לא חוקי',
                 'details': 'הקובץ שנשלח אינו תקף'
+            }), 400
+        
+        # Validate audio file
+        is_valid, error_message = validate_audio_file(audio_file)
+        if not is_valid:
+            logger.error(f"❌ Invalid Audio File: {error_message}")
+            return jsonify({
+                'error': error_message,
+                'details': {
+                    'filename': audio_file.filename,
+                    'content_type': audio_file.content_type
+                }
             }), 400
         
         # Save the uploaded file

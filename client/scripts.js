@@ -92,16 +92,21 @@ transcribeBtn.addEventListener('click', async () => {
     console.log('Raw File Object:', selectedFile);
     
     // Validate file type
-    const allowedTypes = ['audio/mpeg', 'audio/wav', 'audio/mp3', 'audio/x-wav'];
-    console.log('File Details:', {
-        name: selectedFile.name,
-        type: selectedFile.type,
-        size: selectedFile.size
-    });
+    const allowedTypes = [
+        'audio/mpeg',   // MP3
+        'audio/wav',    // WAV
+        'audio/mp3',    // Alternative MP3 mime type
+        'audio/x-wav',  // Alternative WAV mime type
+        'audio/ogg',    // OGG Audio
+        'audio/webm',   // WebM Audio
+        'audio/x-m4a',  // M4A Audio
+        'audio/aac'     // AAC Audio
+    ];
 
     if (!allowedTypes.includes(selectedFile.type)) {
         console.warn('❌ Invalid File Type');
-        alert('אנא בחר קובץ אודיו תקף (MP3 או WAV)');
+        console.warn('File Type Received:', selectedFile.type);
+        alert('אנא בחר קובץ אודיו תקף (MP3, WAV, OGG או פורמטים נוספים)');
         fileInput.value = ''; // Clear the input
         console.groupEnd();
         return;
