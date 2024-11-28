@@ -7,6 +7,7 @@ let selectedFile = null;
 
 // Dynamic transcription endpoint using current domain
 const TRANSCRIPTION_ENDPOINT = `${window.location.origin}/transcribe`;
+console.log('Transcription Endpoint:', TRANSCRIPTION_ENDPOINT);
 
 ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
     dropArea.addEventListener(eventName, preventDefaults, false);
@@ -55,6 +56,9 @@ transcribeBtn.addEventListener('click', async () => {
             const formData = new FormData();
             formData.append('file', selectedFile);
 
+            console.log('Sending request to:', TRANSCRIPTION_ENDPOINT);
+            console.log('File:', selectedFile.name);
+
             transcribeBtn.style.display = 'none';
             loadingAnimation.style.display = 'inline-block';
 
@@ -63,14 +67,19 @@ transcribeBtn.addEventListener('click', async () => {
                 body: formData
             });
 
+            console.log('Response status:', response.status);
+            console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
             if (!response.ok) {
-                throw new Error('שגיאה בביצוע התמלול');
+                const errorText = await response.text();
+                console.error('Error response:', errorText);
+                throw new Error(`שגיאה בביצוע התמלול: ${errorText}`);
             }
 
             const data = await response.json();
             transcriptionText.textContent = data.transcription || 'לא התקבל טקסט';
         } catch (error) {
-            console.error('Error:', error);
+            console.error('Full error:', error);
             transcriptionText.textContent = `שגיאה: ${error.message}`;
         } finally {
             transcribeBtn.style.display = 'block';
