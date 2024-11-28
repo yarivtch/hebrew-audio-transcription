@@ -16,12 +16,9 @@ import io
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Adjust paths for production
+# Uploads directory configuration
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CLIENT_DIR = os.path.join(os.path.dirname(BASE_DIR), 'client')
-UPLOADS_DIR = os.path.join('/opt/render/project/uploads')
-
-# Ensure uploads directory exists
+UPLOADS_DIR = os.path.join(BASE_DIR, '..', 'uploads')
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 
 app = Flask(__name__, static_folder='../client', static_url_path='/')
@@ -211,7 +208,7 @@ def transcribe():
             }), 405
         
         # Check if audio file is present
-        if 'audio' not in request.files:
+        if 'file' not in request.files:
             print("❌ ERROR: No audio file in request")
             return jsonify({
                 'error': 'לא סופק קובץ אודיו',
@@ -222,7 +219,7 @@ def transcribe():
                 }
             }), 400
         
-        audio_file = request.files['audio']
+        audio_file = request.files['file']
         
         # Comprehensive file validation
         is_valid, error_message = validate_audio_file(audio_file)
