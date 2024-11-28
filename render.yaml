@@ -2,8 +2,15 @@ services:
   - type: web
     name: hebrew-audio-transcription
     env: python
+    plan: free
     buildCommand: pip install -r server/requirements.txt
-    startCommand: gunicorn --chdir server server:app
+    startCommand: gunicorn --bind 0.0.0.0:$PORT server.server:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.7
+    autoDeploy: true
+    healthCheckPath: /
+    disk:
+      name: uploads
+      mountPath: /opt/render/project/uploads
+      sizeGB: 1

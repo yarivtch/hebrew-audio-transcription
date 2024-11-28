@@ -18,14 +18,11 @@ logger = logging.getLogger(__name__)
 
 # Adjust paths for production
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CLIENT_DIR = os.path.join(BASE_DIR, 'client')
-UPLOADS_DIR = os.path.join(BASE_DIR, 'uploads')
+CLIENT_DIR = os.path.join(os.path.dirname(BASE_DIR), 'client')
+UPLOADS_DIR = os.path.join('/opt/render/project/uploads')
 
 # Ensure uploads directory exists
 os.makedirs(UPLOADS_DIR, exist_ok=True)
-print(f"Uploads directory: {UPLOADS_DIR}")
-print(f"Uploads directory exists: {os.path.exists(UPLOADS_DIR)}")
-print(f"Uploads directory is writable: {os.access(UPLOADS_DIR, os.W_OK)}")
 
 app = Flask(__name__, static_folder=CLIENT_DIR)
 CORS(app, resources={
@@ -35,6 +32,14 @@ CORS(app, resources={
         "allow_headers": ["Content-Type", "Authorization"]
     }
 })
+
+# Add health check route
+@app.route('/')
+def health_check():
+    return jsonify({
+        'status': 'ok', 
+        'message': 'Hebrew Audio Transcription service is running'
+    })
 
 # Add OPTIONS route for CORS preflight
 @app.route('/transcribe', methods=['OPTIONS'])
@@ -61,7 +66,7 @@ except Exception as e:
 #    return jsonify({
 #        'status': 'ok',
 #        'message': 'Server is running',
-#        'service': 'Hebrew Audio Transcription'
+ #       'service': 'Hebrew Audio Transcription'
  #   })
 @app.route('/')
 def index():
