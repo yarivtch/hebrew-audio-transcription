@@ -78,7 +78,7 @@ fileInput.addEventListener('change', function(e) {
 
 // Transcribe button click event
 transcribeBtn.addEventListener('click', async () => {
-    console.group('📤 Audio File Upload Debugging');
+    console.group('🎙️ Transcription Attempt');
     console.log('Selected File:', selectedFile);
 
     if (!selectedFile) {
@@ -88,53 +88,27 @@ transcribeBtn.addEventListener('click', async () => {
         return;
     }
 
-    console.group('📂 File Selection');
-    console.log('Raw File Object:', selectedFile);
-    
-    // Validate file type
-    const allowedTypes = [
-        'audio/mpeg',   // MP3
-        'audio/wav',    // WAV
-        'audio/mp3',    // Alternative MP3 mime type
-        'audio/x-wav',  // Alternative WAV mime type
-        'audio/ogg',    // OGG Audio
-        'audio/webm',   // WebM Audio
-        'audio/x-m4a',  // M4A Audio
-        'audio/aac'     // AAC Audio
-    ];
-
-    if (!allowedTypes.includes(selectedFile.type)) {
-        console.warn('❌ Invalid File Type');
-        console.warn('File Type Received:', selectedFile.type);
-        alert('אנא בחר קובץ אודיו תקף (MP3, WAV, OGG או פורמטים נוספים)');
-        fileInput.value = ''; // Clear the input
-        console.groupEnd();
-        return;
-    }
-    
-    // Validate file size (max 10MB)
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (selectedFile.size > maxSize) {
-        console.warn('❌ File Too Large');
-        alert('הקובץ גדול מדי. גודל מרבי: 10MB');
-        fileInput.value = ''; // Clear the input
-        console.groupEnd();
-        return;
-    }
-    
-    console.log('✅ File Selected Successfully');
-    console.groupEnd();
-
-    console.group('🎙️ Transcription Attempt');
-    console.log('Selected File:', selectedFile);
-
     // Create FormData with detailed logging
     const formData = new FormData();
     formData.append('file', selectedFile);
 
+    // Detailed FormData logging
     console.log('FormData Contents:');
     for (let [key, value] of formData.entries()) {
         console.log(`  Key: ${key}, Value:`, value);
+        console.log(`  Value Details:`, {
+            name: value.name,
+            type: value.type,
+            size: value.size
+        });
+    }
+
+    // Validate FormData before sending
+    if (formData.get('file') !== selectedFile) {
+        console.error('❌ FormData File Mismatch');
+        alert('שגיאה בהכנת הקובץ להעלאה');
+        console.groupEnd();
+        return;
     }
 
     try {
@@ -146,7 +120,11 @@ transcribeBtn.addEventListener('click', async () => {
 
         const fetchOptions = {
             method: 'POST',
-            body: formData
+            body: formData,
+            // Optional: explicitly set content type
+            // headers: {
+            //     'Content-Type': 'multipart/form-data'
+            // }
         };
 
         console.log('Fetch Options:', fetchOptions);
@@ -162,7 +140,16 @@ transcribeBtn.addEventListener('click', async () => {
         if (!response.ok) {
             const errorText = await response.text();
             console.error('Error Response:', errorText);
-            throw new Error(`שגיאה בביצוע התמלול: ${errorText}`);
+            
+            // Try to parse JSON error
+            try {
+                const errorJson = JSON.parse(errorText);
+                console.error('Parsed Error Details:', errorJson);
+                throw new Error(`שגיאה בביצוע התמלול: ${errorJson.error || errorText}`);
+            } catch (parseError) {
+                console.error('Error Parsing Error:', parseError);
+                throw new Error(`שגיאה בביצוע התמלול: ${errorText}`);
+            }
         }
 
         const data = await response.json();

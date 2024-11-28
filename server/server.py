@@ -403,42 +403,48 @@ def transcribe():
         logger.info(f"    Content Type: {file.content_type}")
 
     try:
-        # Check if file is present in the request
-        if 'file' not in request.files and 'audio' not in request.files:
-            logger.error("❌ No file uploaded")
-            logger.error(f"Available file keys: {list(request.files.keys())}")
-            logger.error(f"Available form keys: {list(request.form.keys())}")
+        # Comprehensive file retrieval attempt
+        audio_file = None
+        possible_keys = ['file', 'audio', 'audioFile', 'uploaded_file']
+        
+        # Try multiple ways of getting the file
+        for key in possible_keys:
+            logger.debug(f"Attempting to retrieve file with key: {key}")
+            
+            # Method 1: request.files
+            if key in request.files:
+                audio_file = request.files[key]
+                logger.debug(f"✅ Found file in request.files[{key}]")
+                break
+            
+            # Method 2: request.files.get()
+            audio_file = request.files.get(key)
+            if audio_file:
+                logger.debug(f"✅ Found file using request.files.get({key})")
+                break
+            
+            # Method 3: Check if file is in form data
+            if key in request.form:
+                logger.debug(f"⚠️ File might be in form data with key: {key}")
+                audio_file = request.form[key]
+                break
+        
+        # Final check for file
+        if not audio_file:
+            logger.error("❌ ERROR: No audio file found")
             return jsonify({
                 'error': 'לא סופק קובץ אודיו',
                 'details': {
-                    'files_in_request': list(request.files.keys()),
-                    'form_data': list(request.form.keys())
+                    'content_type': request.content_type,
+                    'files_keys': list(request.files.keys()),
+                    'form_keys': list(request.form.keys()),
+                    'tried_keys': possible_keys
                 }
             }), 400
-
-        # Try multiple possible file keys
-        audio_file = request.files.get('file') or request.files.get('audio')
-
-        # Validate file presence
-        if not audio_file or audio_file.filename == '':
-            logger.error("❌ Empty or invalid file")
-            logger.error(f"Audio file object: {audio_file}")
-            return jsonify({
-                'error': 'קובץ אודיו לא חוקי',
-                'details': {
-                    'filename': audio_file.filename if audio_file else 'None',
-                    'content_type': audio_file.content_type if audio_file else 'None'
-                }
-            }), 400
-
-        # Log file details
-        logger.info("🎧 Audio File Details:")
-        logger.info(f"  Filename: {audio_file.filename}")
-        logger.info(f"  Content Type: {audio_file.content_type}")
-
-        # Validate filename
-        if not audio_file.filename or len(audio_file.filename) > 255:
-            logger.error("❌ Invalid filename")
+        
+        # Validate file
+        if not audio_file.filename:
+            logger.error("❌ ERROR: Empty filename")
             return jsonify({
                 'error': 'שם קובץ לא חוקי',
                 'details': 'הקובץ שנשלח אינו תקף'
