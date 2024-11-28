@@ -5,6 +5,16 @@ let transcribeBtn = document.getElementById('transcribe-btn');
 let loadingAnimation = document.getElementById('loading-animation');
 let selectedFile = null;
 
+// Environment Configuration
+const ENV = {
+    development: 'http://localhost:5001/transcribe',
+    production: 'https://hebrew-audio-transcription-xxxxx.onrender.com/transcribe'
+};
+
+// Determine current environment (you can set this via build process or manually)
+const CURRENT_ENV = process.env.NODE_ENV || 'development';
+const TRANSCRIPTION_ENDPOINT = ENV[CURRENT_ENV];
+
 ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
     dropArea.addEventListener(eventName, preventDefaults, false);
 });
@@ -52,8 +62,6 @@ transcribeBtn.addEventListener('click', () => {
     }
 });
 
-const API_URL = 'http://localhost:5001/transcribe';
-
 function uploadFile(file) {
     console.log(' Uploading File:', {
         name: file.name,
@@ -62,7 +70,7 @@ function uploadFile(file) {
     });
 
     let formData = new FormData();
-    formData.append('audio', file);
+    formData.append('file', file);
 
     // Log FormData contents
     for (let [key, value] of formData.entries()) {
@@ -73,13 +81,8 @@ function uploadFile(file) {
     transcribeBtn.style.display = 'none';
     loadingAnimation.style.display = 'inline-block';
 
-    fetch(API_URL, {
+    fetch(TRANSCRIPTION_ENDPOINT, {
         method: 'POST',
-        mode: 'cors', 
-        cache: 'no-cache', 
-        credentials: 'same-origin', 
-        headers: {
-        },
         body: formData
     })
     .then(response => {
