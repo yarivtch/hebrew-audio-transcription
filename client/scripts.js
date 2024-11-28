@@ -5,8 +5,11 @@ let transcribeBtn = document.getElementById('transcribe-btn');
 let loadingAnimation = document.getElementById('loading-animation');
 let selectedFile = null;
 
-// Dynamic transcription endpoint using current domain
-const TRANSCRIPTION_ENDPOINT = `${window.location.origin}/transcribe`;
+// Dynamic transcription endpoint based on hostname
+const TRANSCRIPTION_ENDPOINT = window.location.hostname === 'localhost' 
+    ? 'http://localhost:5001/transcribe' 
+    : 'https://hebrew-audio-transcription.onrender.com/transcribe';
+
 console.log('Transcription Endpoint:', TRANSCRIPTION_ENDPOINT);
 
 ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
