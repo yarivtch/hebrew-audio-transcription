@@ -289,18 +289,28 @@ def transcribe():
         print("🔍 DETAILED REQUEST DEBUGGING 🔍")
         print("=" * 50)
         
-        # Print ALL request information
+        # Print entire request details
         print(f"Request Method: {request.method}")
         print(f"Request Content Type: {request.content_type}")
         print(f"Request Headers: {dict(request.headers)}")
         
-        # Print raw request data
-        print("\n📋 Raw Request Data:")
+        # Debug raw request data
+        raw_data = request.get_data()
+        print(f"Raw Data Length: {len(raw_data)} bytes")
+        
+        # Attempt to decode raw data (for debugging)
         try:
-            raw_data = request.get_data(as_text=True)
-            print(f"Raw Data (first 500 chars): {raw_data[:500]}")
+            raw_text = raw_data.decode('utf-8', errors='ignore')
+            print("Raw Data (first 500 chars):")
+            print(raw_text[:500])
         except Exception as e:
-            print(f"Error reading raw data: {e}")
+            print(f"Error decoding raw data: {e}")
+        
+        # Detailed request environment debugging
+        print("\n🌐 Request Environment:")
+        for key, value in request.environ.items():
+            if 'CONTENT' in key or 'FILE' in key or 'UPLOAD' in key:
+                print(f"{key}: {value}")
         
         # Detailed form and files information
         print("\n📂 Form and Files Information:")
@@ -336,98 +346,53 @@ def transcribe():
                 'details': f'שיטת בקשה: {request.method}'
             }), 405
         
-        # Check if audio file is present
-        if not request.files:
-            print("❌ ERROR: No files in request")
+        # Comprehensive file retrieval attempt
+        audio_file = None
+        possible_keys = ['file', 'audio', 'audioFile', 'uploaded_file']
+        
+        # Try multiple ways of getting the file
+        for key in possible_keys:
+            print(f"\n🔍 Attempting to retrieve file with key: {key}")
+            
+            # Method 1: request.files
+            if key in request.files:
+                audio_file = request.files[key]
+                print(f"✅ Found file in request.files[{key}]")
+                break
+            
+            # Method 2: request.files.get()
+            audio_file = request.files.get(key)
+            if audio_file:
+                print(f"✅ Found file using request.files.get({key})")
+                break
+            
+            # Method 3: Check if file is in form data
+            if key in request.form:
+                print(f"⚠️ File might be in form data with key: {key}")
+                audio_file = request.form[key]
+                break
+        
+        # Final check for file
+        if not audio_file:
+            print("❌ ERROR: No audio file found")
             return jsonify({
                 'error': 'לא סופק קובץ אודיו',
                 'details': {
                     'content_type': request.content_type,
                     'files_keys': list(request.files.keys()),
-                    'form_keys': list(request.form.keys())
+                    'form_keys': list(request.form.keys()),
+                    'tried_keys': possible_keys
                 }
             }), 400
         
-        # Attempt to get file with multiple possible keys
-        audio_file = None
-        possible_keys = ['file', 'audio', 'audioFile']
-        for key in possible_keys:
-            if key in request.files:
-                audio_file = request.files[key]
-                print(f"✅ Found file with key: {key}")
-                break
-        
-        if not audio_file:
-            print("❌ ERROR: No audio file found with any expected key")
-            return jsonify({
-                'error': 'לא סופק קובץ אודיו',
-                'details': {
-                    'tried_keys': possible_keys,
-                    'available_keys': list(request.files.keys())
-                }
-            }), 400
-        
-        # Additional file validation
+        # Validate file
         if not audio_file.filename:
             print("❌ ERROR: Empty filename")
             return jsonify({
                 'error': 'שם קובץ לא חוקי',
                 'details': 'הקובץ שנשלח אינו תקף'
             }), 400
-
-        # Comprehensive file validation
-        is_valid, error_message = validate_audio_file(audio_file)
         
-        if not is_valid:
-            print(f"❌ File Validation Failed: {error_message}")
-            return jsonify({
-                'error': 'קובץ האודיו אינו תקף',
-                'details': error_message
-            }), 400
-        
-        print(f"✅ File Validation Passed: {audio_file.filename}")
-        print("=" * 50 + "\n")
-
-        # Extensive logging for debugging
-        print("=" * 50)
-        print("DEBUG: Transcription Request Received")
-        print("=" * 50)
-        
-        # Detailed request information
-        print(f"Request Method: {request.method}")
-        print(f"Request Content Type: {request.content_type}")
-        print(f"Request Headers: {dict(request.headers)}")
-        print(f"Request Form Keys: {list(request.form.keys())}")
-        print(f"Request Files Keys: {list(request.files.keys())}")
-        
-        # Log file details
-        print(f"Audio File Details:")
-        print(f"  Filename: {audio_file.filename}")
-        print(f"  Content Type: {audio_file.content_type}")
-        
-        try:
-            audio_file.seek(0, os.SEEK_END)
-            file_size = audio_file.tell()
-            audio_file.seek(0)
-            print(f"  File Size: {file_size} bytes")
-        except Exception as e:
-            print(f"  Error getting file size: {e}")
-            file_size = 0
-        
-        # Log all incoming request details
-        logger.info(f"Received transcription request")
-        logger.info(f"Request headers: {dict(request.headers)}")
-        logger.info(f"Request content type: {request.content_type}")
-        logger.info(f"Request files: {list(request.files.keys())}")
-        logger.info(f"Request form data: {dict(request.form)}")
-        
-        # Debug: print all request data
-        print("DEBUG: All request data:")
-        print(f"Headers: {dict(request.headers)}")
-        print(f"Content Type: {request.content_type}")
-        print(f"Files: {list(request.files.keys())}")
-        print(f"Form data: {dict(request.form)}")
-
         # Save the uploaded file
         saved_file_path = save_uploaded_file(audio_file)
         
@@ -446,7 +411,7 @@ def transcribe():
             return jsonify({
                 'transcription': transcription,
                 'language': 'he',
-                'confidence': 0.85  # Estimated confidence
+                'confidence': 0.85
             })
         
         except ValueError as ve:
@@ -454,7 +419,7 @@ def transcribe():
             return jsonify({
                 'error': str(ve),
                 'details': {
-                    'filename': audio_file.filename
+                    'filename': audio_file.filename if 'audio_file' in locals() else 'Unknown'
                 }
             }), 400
         
@@ -463,13 +428,20 @@ def transcribe():
             if os.path.exists(saved_file_path):
                 os.unlink(saved_file_path)
     
-    except Exception as e:
-        # Catch-all for unexpected errors
-        print(f"❌ Unexpected Transcription Error: {e}")
-        print(traceback.format_exc())
-        
+    except ValueError as ve:
+        print(f"❌ Validation Error: {ve}")
         return jsonify({
-            'error': 'שגיאה לא צפויה בתהליך התמלול',
+            'error': str(ve),
+            'details': {
+                'filename': audio_file.filename if 'audio_file' in locals() else 'Unknown'
+            }
+        }), 400
+    
+    except Exception as e:
+        print(f"❌ Unexpected Error: {e}")
+        print(traceback.format_exc())
+        return jsonify({
+            'error': 'שגיאה בלתי צפויה בתמלול',
             'details': str(e)
         }), 500
 

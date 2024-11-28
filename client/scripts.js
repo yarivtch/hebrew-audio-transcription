@@ -74,7 +74,7 @@ transcribeBtn.addEventListener('click', async () => {
         return;
     }
 
-    // Try multiple FormData configurations
+    // Create FormData with multiple possible keys
     const formDataConfigs = [
         { key: 'file', data: new FormData() },
         { key: 'audio', data: new FormData() },
@@ -84,6 +84,11 @@ transcribeBtn.addEventListener('click', async () => {
     // Append file to each configuration
     formDataConfigs.forEach(config => {
         config.data.append(config.key, selectedFile);
+        
+        // Log FormData contents for debugging
+        for (let [key, value] of config.data.entries()) {
+            console.log(`FormData Entry - Key: ${key}, Value:`, value);
+        }
     });
 
     try {
@@ -102,22 +107,51 @@ transcribeBtn.addEventListener('click', async () => {
             try {
                 const response = await fetch(TRANSCRIPTION_ENDPOINT, {
                     method: 'POST',
-                    body: config.data
+                    body: config.data,
+                    headers: {
+                        // Optional: explicitly set content type
+                        'Content-Type': 'multipart/form-data'
+                    }
                 });
 
                 console.log('Response status:', response.status);
                 console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
+                // Check response status and content
                 if (response.ok) {
-                    const data = await response.json();
-                    transcriptionText.textContent = data.transcription || 'לא התקבל טקסט';
-                    return; // Exit after successful upload
+                    try {
+                        const data = await response.json();
+                        
+                        // Validate transcription data
+                        if (data.transcription) {
+                            transcriptionText.textContent = data.transcription;
+                            return; // Successful transcription, exit function
+                        } else {
+                            throw new Error('תגובה לא תקינה: לא התקבל טקסט תמלול');
+                        }
+                    } catch (parseError) {
+                        console.error('JSON parsing error:', parseError);
+                        const errorText = await response.text();
+                        console.error('Raw response:', errorText);
+                        throw new Error(`שגיאה בפענוח התגובה: ${parseError.message}`);
+                    }
                 } else {
+                    // Handle error response
                     const errorText = await response.text();
                     console.error(`Error with key ${config.key}:`, errorText);
+                    
+                    // Try to parse error JSON if possible
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        throw new Error(errorData.error || 'שגיאה בלתי צפויה');
+                    } catch {
+                        throw new Error(errorText || 'שגיאה בהעלאת הקובץ');
+                    }
                 }
             } catch (innerError) {
                 console.error(`Error with key ${config.key}:`, innerError);
+                // Continue to next configuration if this one fails
+                continue;
             }
         }
 
