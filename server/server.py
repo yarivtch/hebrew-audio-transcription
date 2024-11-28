@@ -1,16 +1,16 @@
 # server.py
 from flask import Flask, request, jsonify, send_from_directory
-import tempfile
 import os
-import io
 import uuid
-import numpy as np
-import soundfile as sf
 import logging
 from faster_whisper import WhisperModel
 from flask_cors import CORS
-import magic  # Add mime type detection
+import magic
 import traceback
+import tempfile
+import soundfile as sf
+import numpy as np
+import io
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -33,7 +33,20 @@ CORS(app, resources={
     }
 })
 
-# Add health check route
+# Global model initialization with lazy loading
+_model = None
+
+def get_whisper_model():
+    global _model
+    if _model is None:
+        try:
+            _model = WhisperModel('ivrit-ai/faster-whisper-v2-d4', device="cpu", compute_type="int8")
+        except Exception as e:
+            logger.error(f"Model loading error: {e}")
+            _model = None
+    return _model
+
+# Health check route
 @app.route('/')
 def health_check():
     return jsonify({
@@ -41,7 +54,7 @@ def health_check():
         'message': 'Hebrew Audio Transcription service is running'
     })
 
-# Add OPTIONS route for CORS preflight
+# CORS preflight route
 @app.route('/transcribe', methods=['OPTIONS'])
 def transcribe_options():
     response = jsonify({"message": "CORS preflight successful"})
@@ -49,32 +62,6 @@ def transcribe_options():
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
     response.headers.add('Access-Control-Allow-Methods', 'POST')
     return response
-
-# Load Whisper model
-try:
-    model = WhisperModel('ivrit-ai/faster-whisper-v2-d4')
-except Exception as e:
-    logger.error(f"Model loading error: {e}")
-    model = None
-
-#@app.route('/')
-#def test_page():
-#    return send_file('upload.html')
-
-#@app.route('/health')
-#def health_check():
-#    return jsonify({
-#        'status': 'ok',
-#        'message': 'Server is running',
- #       'service': 'Hebrew Audio Transcription'
- #   })
-@app.route('/')
-def index():
-    return send_from_directory(CLIENT_DIR, 'index.html')
-
-@app.route('/<path:path>')
-def static_files(path):
-    return send_from_directory(CLIENT_DIR, path)
 
 # Allowed audio MIME types
 ALLOWED_MIME_TYPES = {
@@ -312,6 +299,7 @@ def transcribe():
             
             # Transcribe audio
             try:
+                model = get_whisper_model()
                 segments, _ = model.transcribe(saved_file_path, language='he', beam_size=15)
                 transcription = ' '.join([s.text for s in segments])
             except Exception as transcribe_error:
@@ -350,6 +338,14 @@ def transcribe():
             'error': 'שגיאה לא צפויה בתהליך התמלול',
             'details': str(e)
         }), 500
+
+@app.route('/')
+def index():
+    return send_from_directory(CLIENT_DIR, 'index.html')
+
+@app.route('/<path:path>')
+def static_files(path):
+    return send_from_directory(CLIENT_DIR, path)
 
 # Adjust host for production
 if __name__ == '__main__':
