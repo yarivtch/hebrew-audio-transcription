@@ -19,6 +19,17 @@ from flask_cors import CORS
 # Machine learning imports
 from faster_whisper import WhisperModel
 
+# Configure extremely verbose logging
+logging.basicConfig(
+    level=logging.DEBUG,  # Most verbose level
+    format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s',
+    handlers=[
+        logging.FileHandler(os.path.join(os.path.dirname(__file__), 'transcription_debug.log'), mode='w'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
 # server.py
 # Configure logging
 logging.basicConfig(
@@ -281,70 +292,69 @@ def transcribe_audio(saved_file_path):
         except Exception as cleanup_error:
             logging.warning(f"Could not remove temporary file: {cleanup_error}")
 
+def log_request_details(request):
+    """
+    Log extremely detailed request information for debugging.
+    """
+    try:
+        logger.debug("=" * 50)
+        logger.debug("🔍 EXTREME REQUEST DEBUGGING 🔍")
+        logger.debug("=" * 50)
+        
+        # Log request method and content type
+        logger.debug(f"Request Method: {request.method}")
+        logger.debug(f"Request Content Type: {request.content_type}")
+        
+        # Log all request headers
+        logger.debug("Request Headers:")
+        for header, value in request.headers:
+            logger.debug(f"  {header}: {value}")
+        
+        # Log environment variables related to the request
+        logger.debug("\nRequest Environment Variables:")
+        for key, value in request.environ.items():
+            if any(x in key.lower() for x in ['content', 'type', 'length', 'file', 'upload']):
+                logger.debug(f"  {key}: {value}")
+        
+        # Log form data
+        logger.debug("\nForm Data:")
+        for key, value in request.form.items():
+            logger.debug(f"  {key}: {value}")
+        
+        # Log files information
+        logger.debug("\nFiles Information:")
+        logger.debug(f"  Number of files: {len(request.files)}")
+        for key, file in request.files.items():
+            logger.debug(f"  File Key: {key}")
+            logger.debug(f"    Filename: {file.filename}")
+            logger.debug(f"    Content Type: {file.content_type}")
+            try:
+                file.seek(0, os.SEEK_END)
+                file_size = file.tell()
+                file.seek(0)
+                logger.debug(f"    File Size: {file_size} bytes")
+            except Exception as e:
+                logger.debug(f"    Error getting file size: {e}")
+        
+        # Attempt to read raw data
+        try:
+            raw_data = request.get_data()
+            logger.debug(f"Raw Data Length: {len(raw_data)} bytes")
+            raw_text = raw_data.decode('utf-8', errors='ignore')
+            logger.debug("Raw Data (first 500 chars):")
+            logger.debug(raw_text[:500])
+        except Exception as e:
+            logger.debug(f"Error reading raw data: {e}")
+        
+        logger.debug("=" * 50)
+    except Exception as log_error:
+        logger.error(f"Error in logging request details: {log_error}")
+
 @app.route('/transcribe', methods=['POST'])
 def transcribe():
     try:
-        # EXTREME DEBUGGING
-        print("\n" + "=" * 50)
-        print("🔍 DETAILED REQUEST DEBUGGING 🔍")
-        print("=" * 50)
-        
-        # Print entire request details
-        print(f"Request Method: {request.method}")
-        print(f"Request Content Type: {request.content_type}")
-        print(f"Request Headers: {dict(request.headers)}")
-        
-        # Debug raw request data
-        raw_data = request.get_data()
-        print(f"Raw Data Length: {len(raw_data)} bytes")
-        
-        # Attempt to decode raw data (for debugging)
-        try:
-            raw_text = raw_data.decode('utf-8', errors='ignore')
-            print("Raw Data (first 500 chars):")
-            print(raw_text[:500])
-        except Exception as e:
-            print(f"Error decoding raw data: {e}")
-        
-        # Detailed request environment debugging
-        print("\n🌐 Request Environment:")
-        for key, value in request.environ.items():
-            if 'CONTENT' in key or 'FILE' in key or 'UPLOAD' in key:
-                print(f"{key}: {value}")
-        
-        # Detailed form and files information
-        print("\n📂 Form and Files Information:")
-        print(f"Form Keys: {list(request.form.keys())}")
-        print(f"Files Keys: {list(request.files.keys())}")
-        
-        # Detailed form data
-        if request.form:
-            print("\n📋 Form Data:")
-            for key, value in request.form.items():
-                print(f"  {key}: {value}")
-        
-        # Detailed file information
-        if request.files:
-            print("\n🗂️ File Details:")
-            for key, file in request.files.items():
-                print(f"File Key: {key}")
-                print(f"  Filename: {file.filename}")
-                print(f"  Content Type: {file.content_type}")
-                try:
-                    file.seek(0, os.SEEK_END)
-                    file_size = file.tell()
-                    file.seek(0)
-                    print(f"  File Size: {file_size} bytes")
-                except Exception as e:
-                    print(f"  Error getting file size: {e}")
-        
-        # Validate request method
-        if request.method != 'POST':
-            print("❌ ERROR: Invalid request method")
-            return jsonify({
-                'error': 'שיטת בקשה לא חוקית',
-                'details': f'שיטת בקשה: {request.method}'
-            }), 405
+        # Log extremely detailed request information
+        log_request_details(request)
         
         # Comprehensive file retrieval attempt
         audio_file = None
@@ -352,29 +362,29 @@ def transcribe():
         
         # Try multiple ways of getting the file
         for key in possible_keys:
-            print(f"\n🔍 Attempting to retrieve file with key: {key}")
+            logger.debug(f"Attempting to retrieve file with key: {key}")
             
             # Method 1: request.files
             if key in request.files:
                 audio_file = request.files[key]
-                print(f"✅ Found file in request.files[{key}]")
+                logger.debug(f"✅ Found file in request.files[{key}]")
                 break
             
             # Method 2: request.files.get()
             audio_file = request.files.get(key)
             if audio_file:
-                print(f"✅ Found file using request.files.get({key})")
+                logger.debug(f"✅ Found file using request.files.get({key})")
                 break
             
             # Method 3: Check if file is in form data
             if key in request.form:
-                print(f"⚠️ File might be in form data with key: {key}")
+                logger.debug(f"⚠️ File might be in form data with key: {key}")
                 audio_file = request.form[key]
                 break
         
         # Final check for file
         if not audio_file:
-            print("❌ ERROR: No audio file found")
+            logger.error("❌ ERROR: No audio file found")
             return jsonify({
                 'error': 'לא סופק קובץ אודיו',
                 'details': {
@@ -387,7 +397,7 @@ def transcribe():
         
         # Validate file
         if not audio_file.filename:
-            print("❌ ERROR: Empty filename")
+            logger.error("❌ ERROR: Empty filename")
             return jsonify({
                 'error': 'שם קובץ לא חוקי',
                 'details': 'הקובץ שנשלח אינו תקף'
@@ -429,7 +439,8 @@ def transcribe():
                 os.unlink(saved_file_path)
     
     except ValueError as ve:
-        print(f"❌ Validation Error: {ve}")
+        logger.error(f"❌ Validation Error: {ve}")
+        logger.error(traceback.format_exc())
         return jsonify({
             'error': str(ve),
             'details': {
@@ -438,8 +449,8 @@ def transcribe():
         }), 400
     
     except Exception as e:
-        print(f"❌ Unexpected Error: {e}")
-        print(traceback.format_exc())
+        logger.error(f"❌ Unexpected Error: {e}")
+        logger.error(traceback.format_exc())
         return jsonify({
             'error': 'שגיאה בלתי צפויה בתמלול',
             'details': str(e)
