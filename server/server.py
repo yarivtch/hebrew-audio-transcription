@@ -16,7 +16,8 @@ import traceback
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Adjust paths for production
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CLIENT_DIR = os.path.join(BASE_DIR, 'client')
 UPLOADS_DIR = os.path.join(BASE_DIR, 'uploads')
 
@@ -29,12 +30,7 @@ print(f"Uploads directory is writable: {os.access(UPLOADS_DIR, os.W_OK)}")
 app = Flask(__name__, static_folder=CLIENT_DIR)
 CORS(app, resources={
     r"/transcribe": {
-        "origins": [
-            "http://localhost:5001", 
-            "http://127.0.0.1:5001", 
-            "file://", 
-            "*"
-        ],
+        "origins": ["*"],
         "methods": ["POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"]
     }
@@ -49,8 +45,12 @@ def transcribe_options():
     response.headers.add('Access-Control-Allow-Methods', 'POST')
     return response
 
-# טען את המודל פעם אחת באתחול
-model = WhisperModel('ivrit-ai/faster-whisper-v2-d4')
+# Load Whisper model
+try:
+    model = WhisperModel('ivrit-ai/faster-whisper-v2-d4')
+except Exception as e:
+    logger.error(f"Model loading error: {e}")
+    model = None
 
 #@app.route('/')
 #def test_page():
@@ -346,14 +346,7 @@ def transcribe():
             'details': str(e)
         }), 500
 
+# Adjust host for production
 if __name__ == '__main__':
-    print(f"BASE_DIR: {BASE_DIR}")
-    try:
-        print("Attempting to start server...")
-        print(f"Host: localhost")
-        print(f"Port: 5001")
-        app.run(host='localhost', port=5001, debug=True)
-    except Exception as e:
-        print(f"Server startup failed: {e}")
-        import traceback
-        traceback.print_exc()
+    port = int(os.environ.get('PORT', 5001))
+    app.run(host='0.0.0.0', port=port, debug=False)

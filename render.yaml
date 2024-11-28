@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: hebrew-audio-transcription
+    env: python
+    buildCommand: pip install -r server/requirements.txt
+    startCommand: gunicorn --chdir server server:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.7
