@@ -74,42 +74,55 @@ transcribeBtn.addEventListener('click', async () => {
         return;
     }
 
-    const formData = new FormData();
-    formData.append('file', selectedFile);
+    // Try multiple FormData configurations
+    const formDataConfigs = [
+        { key: 'file', data: new FormData() },
+        { key: 'audio', data: new FormData() },
+        { key: 'audioFile', data: new FormData() }
+    ];
 
-    // Log FormData contents for debugging
-    for (let [key, value] of formData.entries()) {
-        console.log(`FormData Entry - Key: ${key}, Value:`, value);
-    }
+    // Append file to each configuration
+    formDataConfigs.forEach(config => {
+        config.data.append(config.key, selectedFile);
+    });
 
     try {
-        console.log('Sending request to:', TRANSCRIPTION_ENDPOINT);
-        console.log('File Details:', {
-            name: selectedFile.name,
-            type: selectedFile.type,
-            size: selectedFile.size
-        });
+        for (const config of formDataConfigs) {
+            console.log(`Attempting upload with key: ${config.key}`);
+            console.log('File Details:', {
+                name: selectedFile.name,
+                type: selectedFile.type,
+                size: selectedFile.size
+            });
 
-        transcribeBtn.disabled = true;
-        loadingAnimation.style.display = 'inline-block';
-        transcriptionText.textContent = '';
+            transcribeBtn.disabled = true;
+            loadingAnimation.style.display = 'inline-block';
+            transcriptionText.textContent = '';
 
-        const response = await fetch(TRANSCRIPTION_ENDPOINT, {
-            method: 'POST',
-            body: formData
-        });
+            try {
+                const response = await fetch(TRANSCRIPTION_ENDPOINT, {
+                    method: 'POST',
+                    body: config.data
+                });
 
-        console.log('Response status:', response.status);
-        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+                console.log('Response status:', response.status);
+                console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Error response:', errorText);
-            throw new Error(`שגיאה בביצוע התמלול: ${errorText}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    transcriptionText.textContent = data.transcription || 'לא התקבל טקסט';
+                    return; // Exit after successful upload
+                } else {
+                    const errorText = await response.text();
+                    console.error(`Error with key ${config.key}:`, errorText);
+                }
+            } catch (innerError) {
+                console.error(`Error with key ${config.key}:`, innerError);
+            }
         }
 
-        const data = await response.json();
-        transcriptionText.textContent = data.transcription || 'לא התקבל טקסט';
+        // If all attempts fail
+        throw new Error('כל ניסיונות ההעלאה נכשלו');
     } catch (error) {
         console.error('Full error:', error);
         transcriptionText.textContent = `שגיאה: ${error.message}`;
