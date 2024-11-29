@@ -90,6 +90,8 @@ function uploadFile(file) {
     });
 
     let formData = new FormData();
+    // Try multiple keys for maximum compatibility
+    formData.append('file', file);
     formData.append('audio', file);
 
     // Log FormData contents
@@ -109,7 +111,13 @@ function uploadFile(file) {
     .then(response => {
         console.log('Response Status:', response.status);
         if (!response.ok) {
-            throw new Error('שגיאה בתמלול');
+            // Try to get error details
+            return response.json().then(errorData => {
+                console.error('Server Error:', errorData);
+                throw new Error(errorData.error || 'שגיאה בתמלול');
+            }).catch(() => {
+                throw new Error('שגיאה בתמלול');
+            });
         }
         return response.json();
     })
