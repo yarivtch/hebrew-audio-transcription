@@ -43,27 +43,12 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-# Uploads directory configuration
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOADS_DIR = os.path.join(BASE_DIR, 'uploads')
-os.makedirs(UPLOADS_DIR, exist_ok=True)
+# Temporary file handling configured
+logger.info(" Temporary file handling configured")
 
-logger.info(f" BASE_DIR: {BASE_DIR}")
-logger.info(f" UPLOADS_DIR: {UPLOADS_DIR}")
-logger.info(f" Absolute UPLOADS_DIR: {os.path.abspath(UPLOADS_DIR)}")
-logger.info(f" Current Working Directory: {os.getcwd()}")
-
-# Ensure uploads directory exists with proper permissions
-try:
-    print(f" Uploads directory created/verified: {UPLOADS_DIR}")
-    
-    # Set directory permissions
-    os.chmod(UPLOADS_DIR, 0o755)  
-except Exception as e:
-    print(f" Error creating uploads directory: {e}")
-    UPLOADS_DIR = os.path.join(tempfile.gettempdir(), 'hebrew_transcription_uploads')
-    os.makedirs(UPLOADS_DIR, exist_ok=True)
-    print(f" Fallback uploads directory: {UPLOADS_DIR}")
+# Fallback temporary directory setup
+TEMP_DIR = tempfile.gettempdir()
+logger.info(f" Temporary directory: {TEMP_DIR}")
 
 app = Flask(__name__, static_folder='../client', static_url_path='/')
 CORS(app, resources={
@@ -143,7 +128,7 @@ def validate_audio_file(file):
         import magic
         
         # Save file temporarily to check its actual type
-        temp_path = os.path.join(app.config['UPLOAD_FOLDER'], f"temp_{uuid.uuid4()}")
+        temp_path = os.path.join(tempfile.gettempdir(), f"temp_{uuid.uuid4()}")
         file.save(temp_path)
         
         # Detect file type
@@ -235,7 +220,7 @@ def save_uploaded_file(file):
     try:
         # Create a temporary file with a unique name and appropriate suffix
         # Use the original file's extension to ensure correct file type
-        file_extension = os.path.splitext(file.filename)[1]
+        file_extension = os.path.splitext(file.filename)[1] or '.bin'
         
         # Create temporary file that will be automatically deleted when closed
         with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
