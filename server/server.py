@@ -402,54 +402,47 @@ def transcribe():
         logger.info(f"    Filename: {file.filename}")
         logger.info(f"    Content Type: {file.content_type}")
 
-    try:
-        # Comprehensive file retrieval attempt
-        audio_file = None
-        possible_keys = ['file', 'audio', 'audioFile', 'uploaded_file']
+    # Comprehensive file retrieval attempt
+    audio_files = []
+    possible_keys = ['file', 'audio', 'audioFile', 'uploaded_file']
+    
+    # Try multiple ways of getting the file
+    for key in possible_keys:
+        logger.debug(f"Attempting to retrieve file with key: {key}")
         
-        # Try multiple ways of getting the file
-        for key in possible_keys:
-            logger.debug(f"Attempting to retrieve file with key: {key}")
-            
-            # Method 1: request.files
-            if key in request.files:
-                audio_file = request.files[key]
-                logger.debug(f"✅ Found file in request.files[{key}]")
-                break
-            
-            # Method 2: request.files.get()
-            audio_file = request.files.get(key)
-            if audio_file:
-                logger.debug(f"✅ Found file using request.files.get({key})")
-                break
-            
-            # Method 3: Check if file is in form data
-            if key in request.form:
-                logger.debug(f"⚠️ File might be in form data with key: {key}")
-                audio_file = request.form[key]
-                break
+        # Method 1: request.files
+        if key in request.files:
+            audio_files.extend(request.files.getlist(key))
+            logger.debug(f"✅ Found files in request.files[{key}]")
         
-        # Final check for file
-        if not audio_file:
-            logger.error("❌ ERROR: No audio file found")
-            return jsonify({
-                'error': 'לא סופק קובץ אודיו',
-                'details': {
-                    'content_type': request.content_type,
-                    'files_keys': list(request.files.keys()),
-                    'form_keys': list(request.form.keys()),
-                    'tried_keys': possible_keys
-                }
-            }), 400
-        
-        # Validate file
+        # Method 2: request.files.get()
+        files = request.files.getlist(key)
+        if files:
+            audio_files.extend(files)
+            logger.debug(f"✅ Found files using request.files.get({key})")
+
+    # Final check for file
+    if not audio_files:
+        logger.error("❌ ERROR: No audio file found")
+        return jsonify({
+            'error': 'לא סופק קובץ אודיו',
+            'details': {
+                'content_type': request.content_type,
+                'files_keys': list(request.files.keys()),
+                'form_keys': list(request.form.keys()),
+                'tried_keys': possible_keys
+            }
+        }), 400
+
+    # Validate files
+    for audio_file in audio_files:
         if not audio_file.filename:
             logger.error("❌ ERROR: Empty filename")
             return jsonify({
                 'error': 'שם קובץ לא חוקי',
                 'details': 'הקובץ שנשלח אינו תקף'
             }), 400
-        
+
         # Validate audio file
         is_valid, error_message = validate_audio_file(audio_file)
         if not is_valid:
@@ -461,13 +454,18 @@ def transcribe():
                     'content_type': audio_file.content_type
                 }
             }), 400
-        
-        # Save the uploaded file
+    
+    # Save the uploaded files
+    saved_file_paths = []
+    for audio_file in audio_files:
         saved_file_path = save_uploaded_file(audio_file)
         logger.info(f"💾 File saved to: {saved_file_path}")
-        
-        try:
-            # Process and validate audio file
+        saved_file_paths.append(saved_file_path)
+    
+    try:
+        # Process and validate audio files
+        transcriptions = []
+        for saved_file_path in saved_file_paths:
             audio_properties = process_audio_file(saved_file_path)
             
             # Log audio file properties
@@ -478,42 +476,32 @@ def transcribe():
             # Transcribe audio
             transcription = transcribe_audio(saved_file_path)
             logger.info(f"📝 Transcription: {transcription}")
-            
-            return jsonify({
-                'transcription': transcription,
-                'language': 'he',
-                'confidence': 0.85
-            })
+            transcriptions.append(transcription)
         
-        except ValueError as ve:
-            # Handle specific audio processing errors
-            logger.error(f"❌ Audio Processing Error: {ve}")
-            logger.error(traceback.format_exc())
-            return jsonify({
-                'error': str(ve),
-                'details': {
-                    'filename': audio_file.filename,
-                    'content_type': audio_file.content_type
-                }
-            }), 400
-        
-        finally:
-            # Clean up uploaded file
+        return jsonify({
+            'transcriptions': transcriptions,
+            'language': 'he',
+            'confidence': 0.85
+        })
+    
+    except ValueError as ve:
+        # Handle specific audio processing errors
+        logger.error(f"❌ Audio Processing Error: {ve}")
+        logger.error(traceback.format_exc())
+        return jsonify({
+            'error': str(ve),
+            'details': {
+                'filename': audio_files[0].filename,
+                'content_type': audio_files[0].content_type
+            }
+        }), 400
+    
+    finally:
+        # Clean up uploaded files
+        for saved_file_path in saved_file_paths:
             if os.path.exists(saved_file_path):
                 os.unlink(saved_file_path)
                 logger.info(f"🗑️ Deleted temporary file: {saved_file_path}")
-    
-    except Exception as e:
-        logger.error(f"❌ Unexpected Error: {e}")
-        logger.error(traceback.format_exc())
-        return jsonify({
-            'error': 'שגיאה בלתי צפויה בתמלול',
-            'details': {
-                'error_message': str(e),
-                'files_in_request': list(request.files.keys()),
-                'form_data': list(request.form.keys())
-            }
-        }), 500
 
 @app.route('/')
 def serve_client():

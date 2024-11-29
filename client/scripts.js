@@ -76,93 +76,54 @@ fileInput.addEventListener('change', function(e) {
     handleFiles(this.files);
 });
 
-// Transcribe button click event
-transcribeBtn.addEventListener('click', async () => {
-    console.group('🎙️ Transcription Attempt');
-    console.log('Selected File:', selectedFile);
-
-    if (!selectedFile) {
-        console.warn('❌ No File Selected');
-        alert('אנא בחר קובץ אודיו');
-        console.groupEnd();
-        return;
-    }
-
-    // Create FormData with detailed logging
-    const formData = new FormData();
-    formData.append('file', selectedFile);
-
-    // Detailed FormData logging
-    console.log('FormData Contents:');
-    for (let [key, value] of formData.entries()) {
-        console.log(`  Key: ${key}, Value:`, value);
-        console.log(`  Value Details:`, {
-            name: value.name,
-            type: value.type,
-            size: value.size
-        });
-    }
-
-    // Validate FormData before sending
-    if (formData.get('file') !== selectedFile) {
-        console.error('❌ FormData File Mismatch');
-        alert('שגיאה בהכנת הקובץ להעלאה');
-        console.groupEnd();
-        return;
-    }
-
-    try {
-        console.log('Sending Request to:', TRANSCRIPTION_ENDPOINT);
-        
-        transcribeBtn.disabled = true;
-        loadingAnimation.style.display = 'inline-block';
-        transcriptionText.textContent = '';
-
-        const fetchOptions = {
-            method: 'POST',
-            body: formData,
-            // Optional: explicitly set content type
-            // headers: {
-            //     'Content-Type': 'multipart/form-data'
-            // }
-        };
-
-        console.log('Fetch Options:', fetchOptions);
-
-        const response = await fetch(TRANSCRIPTION_ENDPOINT, fetchOptions);
-
-        console.log('Response Details:', {
-            status: response.status,
-            statusText: response.statusText,
-            headers: Object.fromEntries(response.headers.entries())
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Error Response:', errorText);
-            
-            // Try to parse JSON error
-            try {
-                const errorJson = JSON.parse(errorText);
-                console.error('Parsed Error Details:', errorJson);
-                throw new Error(`שגיאה בביצוע התמלול: ${errorJson.error || errorText}`);
-            } catch (parseError) {
-                console.error('Error Parsing Error:', parseError);
-                throw new Error(`שגיאה בביצוע התמלול: ${errorText}`);
-            }
-        }
-
-        const data = await response.json();
-        console.log('Transcription Response:', data);
-        
-        transcriptionText.textContent = data.transcription || 'לא התקבל טקסט';
-        console.log('✅ Transcription Successful');
-    } catch (error) {
-        console.error('❌ Full Transcription Error:', error);
-        transcriptionText.textContent = `שגיאה: ${error.message}`;
-    } finally {
-        transcribeBtn.disabled = false;
-        loadingAnimation.style.display = 'none';
-        console.groupEnd();
+transcribeBtn.addEventListener('click', () => {
+    if (selectedFile) {
+        uploadFile(selectedFile);
     }
 });
+
+function uploadFile(file) {
+    console.log('Uploading File:', {
+        name: file.name,
+        type: file.type,
+        size: file.size
+    });
+
+    let formData = new FormData();
+    formData.append('audio', file);
+
+    // Log FormData contents
+    for (let [key, value] of formData.entries()) {
+        console.log(`FormData Entry - Key: ${key}, Value:`, value);
+    }
+
+    // Disable transcribe button and show loading
+    transcribeBtn.disabled = true;
+    loadingAnimation.style.display = 'inline-block';
+    transcriptionText.textContent = '';
+
+    fetch(TRANSCRIPTION_ENDPOINT, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        console.log('Response Status:', response.status);
+        if (!response.ok) {
+            throw new Error('שגיאה בתמלול');
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Transcription Response:', data);
+        transcriptionText.textContent = data.transcription || 'לא התקבל טקסט';
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        transcriptionText.textContent = `שגיאה: ${error.message}`;
+    })
+    .finally(() => {
+        // Re-enable transcribe button and hide loading
+        transcribeBtn.disabled = false;
+        loadingAnimation.style.display = 'none';
+    });
+};
