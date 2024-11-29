@@ -25,6 +25,13 @@ env/
 *.swp
 *.swo
 
+# Uploads directories
+/uploads/
+/server/uploads/
+*.wav
+*.mp3
+*.ogg
+
 # Uploads directory
 uploads/
 

@@ -45,20 +45,25 @@ logger = logging.getLogger(__name__)
 
 # Uploads directory configuration
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOADS_DIR = os.path.join(BASE_DIR, 'uploads')  
+UPLOADS_DIR = os.path.join(BASE_DIR, 'uploads')
+os.makedirs(UPLOADS_DIR, exist_ok=True)
+
+logger.info(f" BASE_DIR: {BASE_DIR}")
+logger.info(f" UPLOADS_DIR: {UPLOADS_DIR}")
+logger.info(f" Absolute UPLOADS_DIR: {os.path.abspath(UPLOADS_DIR)}")
+logger.info(f" Current Working Directory: {os.getcwd()}")
 
 # Ensure uploads directory exists with proper permissions
 try:
-    os.makedirs(UPLOADS_DIR, exist_ok=True)
-    print(f"✅ Uploads directory created/verified: {UPLOADS_DIR}")
+    print(f" Uploads directory created/verified: {UPLOADS_DIR}")
     
     # Set directory permissions
     os.chmod(UPLOADS_DIR, 0o755)  
 except Exception as e:
-    print(f"❌ Error creating uploads directory: {e}")
+    print(f" Error creating uploads directory: {e}")
     UPLOADS_DIR = os.path.join(tempfile.gettempdir(), 'hebrew_transcription_uploads')
     os.makedirs(UPLOADS_DIR, exist_ok=True)
-    print(f"⚠️ Fallback uploads directory: {UPLOADS_DIR}")
+    print(f" Fallback uploads directory: {UPLOADS_DIR}")
 
 app = Flask(__name__, static_folder='../client', static_url_path='/')
 CORS(app, resources={
@@ -123,13 +128,13 @@ def validate_audio_file(file):
         Tuple (is_valid, error_message)
     """
     # Log detailed file information
-    logger.info("🔍 Audio File Validation:")
+    logger.info(" Audio File Validation:")
     logger.info(f"  Filename: {file.filename}")
     logger.info(f"  Content Type: {file.content_type}")
     
     # Check if content type is allowed
     if file.content_type not in ALLOWED_MIME_TYPES:
-        logger.warning(f"❌ Unsupported MIME Type: {file.content_type}")
+        logger.warning(f" Unsupported MIME Type: {file.content_type}")
         logger.warning(f"  Allowed Types: {ALLOWED_MIME_TYPES}")
         return False, f"סוג קובץ לא נתמך: {file.content_type}"
     
@@ -152,13 +157,13 @@ def validate_audio_file(file):
         
         # Check if detected type is allowed
         if detected_type not in ALLOWED_MIME_TYPES:
-            logger.warning(f"❌ Detected Unsupported MIME Type: {detected_type}")
+            logger.warning(f" Detected Unsupported MIME Type: {detected_type}")
             return False, f"סוג קובץ לא תקף: {detected_type}"
     
     except ImportError:
-        logger.warning("⚠️ python-magic not installed. Skipping advanced type detection.")
+        logger.warning(" python-magic not installed. Skipping advanced type detection.")
     except Exception as e:
-        logger.error(f"❌ File Type Detection Error: {e}")
+        logger.error(f" File Type Detection Error: {e}")
         return False, "שגיאה בזיהוי סוג הקובץ"
     
     # Check if file exists and has a filename
@@ -195,7 +200,7 @@ def process_audio_file(saved_file_path):
             
             # Convert to mono if stereo
             if n_channels > 1:
-                print(f"🔊 Converting {n_channels}-channel audio to mono")
+                print(f" Converting {n_channels}-channel audio to mono")
                 
             # Basic validation
             if duration <= 0:
@@ -208,51 +213,46 @@ def process_audio_file(saved_file_path):
             }
     
     except sf.SoundFileError as sf_error:
-        print(f"❌ SoundFile Error: {sf_error}")
+        print(f" SoundFile Error: {sf_error}")
         print(traceback.format_exc())
         raise ValueError(f"שגיאה בקריאת קובץ האודיו: {sf_error}")
     
     except Exception as e:
-        print(f"❌ Unexpected Error Processing Audio: {e}")
+        print(f" Unexpected Error Processing Audio: {e}")
         print(traceback.format_exc())
         raise ValueError(f"שגיאה לא צפויה בעיבוד האודיו: {e}")
 
-def save_uploaded_file(audio_file):
+def save_uploaded_file(file):
     """
-    Save uploaded file with comprehensive error handling and logging.
+    Save uploaded file to a temporary file that will be automatically deleted.
     
     Args:
-        audio_file (FileStorage): Uploaded file object
+        file (FileStorage): Uploaded file object
     
     Returns:
-        str: Path to saved file
+        str: Path to the temporary saved file
     """
     try:
-        # Generate unique filename
-        unique_filename = f"{uuid.uuid4()}_{secure_filename(audio_file.filename)}"
-        saved_file_path = os.path.join(UPLOADS_DIR, unique_filename)
+        # Create a temporary file with a unique name and appropriate suffix
+        # Use the original file's extension to ensure correct file type
+        file_extension = os.path.splitext(file.filename)[1]
         
-        # Log file saving details
-        logging.info(f"Saving uploaded file: {unique_filename}")
-        logging.info(f"Saved file path: {saved_file_path}")
-        logging.info(f"File size: {audio_file.content_length} bytes")
-        
-        # Save the file
-        audio_file.save(saved_file_path)
-        
-        # Verify file was saved
-        if not os.path.exists(saved_file_path):
-            raise IOError("File was not saved successfully")
-        
-        # Set file permissions
-        os.chmod(saved_file_path, 0o644)
-        
-        return saved_file_path
+        # Create temporary file that will be automatically deleted when closed
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
+            # Save the uploaded file to the temporary location
+            file.save(temp_file.name)
+            
+            # Log temporary file details
+            logger.info(f" Temporary File Created:")
+            logger.info(f"  Path: {temp_file.name}")
+            logger.info(f"  Extension: {file_extension}")
+            
+            # Return the path to the temporary file
+            return temp_file.name
     
     except Exception as e:
-        logging.error(f"File saving error: {e}")
-        logging.error(traceback.format_exc())
-        raise ValueError(f"שגיאה בשמירת קובץ האודיו: {e}")
+        logger.error(f" Temporary File Creation Error: {e}")
+        raise ValueError(f"שגיאה ביצירת קובץ זמני: {e}")
 
 def transcribe_audio(saved_file_path):
     """
@@ -324,7 +324,7 @@ def log_request_details(request):
     """
     try:
         logger.debug("=" * 50)
-        logger.debug("🔍 EXTREME REQUEST DEBUGGING 🔍")
+        logger.debug(" EXTREME REQUEST DEBUGGING ")
         logger.debug("=" * 50)
         
         # Log request method and content type
@@ -379,24 +379,24 @@ def log_request_details(request):
 @app.route('/transcribe', methods=['POST'])
 def transcribe():
     # Extremely verbose logging of request details
-    logger.info("🚀 Transcription Request Received")
-    logger.info("📋 Request Details:")
+    logger.info(" Transcription Request Received")
+    logger.info(" Request Details:")
     logger.info(f"  Method: {request.method}")
     logger.info(f"  Content Type: {request.content_type}")
     logger.info(f"  Content Length: {request.content_length}")
 
     # Log all headers
-    logger.info("📨 Request Headers:")
+    logger.info(" Request Headers:")
     for header, value in request.headers:
         logger.info(f"  {header}: {value}")
 
     # Log form data
-    logger.info("📝 Form Data:")
+    logger.info(" Form Data:")
     for key, value in request.form.items():
         logger.info(f"  {key}: {value}")
 
     # Log files
-    logger.info("📁 Files in Request:")
+    logger.info(" Files in Request:")
     for key, file in request.files.items():
         logger.info(f"  Key: {key}")
         logger.info(f"    Filename: {file.filename}")
@@ -404,12 +404,12 @@ def transcribe():
         logger.info(f"    Content Length: {file.content_length}")
 
     # Extremely detailed logging of request environment
-    logger.info("🌐 Request Environment:")
+    logger.info(" Request Environment:")
     logger.info(f"  Remote Address: {request.remote_addr}")
     logger.info(f"  User Agent: {request.user_agent}")
     
     # Log all possible file retrieval methods
-    logger.info("🔍 File Retrieval Diagnostic:")
+    logger.info(" File Retrieval Diagnostic:")
     logger.info(f"  request.files keys: {list(request.files.keys())}")
     logger.info(f"  request.form keys: {list(request.form.keys())}")
 
@@ -424,18 +424,18 @@ def transcribe():
         # Method 1: request.files
         if key in request.files:
             audio_file = request.files[key]
-            logger.debug(f"✅ Found file in request.files[{key}]")
+            logger.debug(f" Found file in request.files[{key}]")
             break
         
         # Method 2: request.files.get()
         audio_file = request.files.get(key)
         if audio_file:
-            logger.debug(f"✅ Found file using request.files.get({key})")
+            logger.debug(f" Found file using request.files.get({key})")
             break
 
     # Final check for file
     if not audio_file:
-        logger.error("❌ ERROR: No audio file found")
+        logger.error(" ERROR: No audio file found")
         logger.error(f"Available form keys: {list(request.form.keys())}")
         logger.error(f"Available files keys: {list(request.files.keys())}")
         return jsonify({
@@ -450,14 +450,14 @@ def transcribe():
 
     # Validate file
     if not audio_file.filename:
-        logger.error("❌ ERROR: Empty filename")
+        logger.error(" ERROR: Empty filename")
         return jsonify({
             'error': 'שם קובץ לא חוקי',
             'details': 'הקובץ שנשלח אינו תקף'
         }), 400
 
     # Log file details for debugging
-    logger.info(f"📄 Received File Details:")
+    logger.info(f" Received File Details:")
     logger.info(f"  Filename: {audio_file.filename}")
     logger.info(f"  Content Type: {audio_file.content_type}")
     logger.info(f"  File Size: {audio_file.content_length} bytes")
@@ -465,7 +465,7 @@ def transcribe():
     # Validate audio file
     is_valid, error_message = validate_audio_file(audio_file)
     if not is_valid:
-        logger.error(f"❌ Invalid Audio File: {error_message}")
+        logger.error(f" Invalid Audio File: {error_message}")
         return jsonify({
             'error': error_message,
             'details': {
@@ -474,39 +474,40 @@ def transcribe():
             }
         }), 400
     
-    # Save the uploaded file
     try:
+        # Save to temporary file
         saved_file_path = save_uploaded_file(audio_file)
-        logger.info(f"💾 File saved to: {saved_file_path}")
-    except Exception as save_error:
-        logger.error(f"❌ File Save Error: {save_error}")
-        return jsonify({
-            'error': 'שגיאה בשמירת הקובץ',
-            'details': str(save_error)
-        }), 400
-    
-    try:
-        # Process and validate audio file
-        audio_properties = process_audio_file(saved_file_path)
         
-        # Log audio file properties
-        logger.info("🎧 Audio File Properties:")
-        for key, value in audio_properties.items():
-            logger.info(f"  {key}: {value}")
+        try:
+            # Process and validate audio file
+            audio_properties = process_audio_file(saved_file_path)
+            
+            # Log audio file properties
+            logger.info(" Audio File Properties:")
+            for key, value in audio_properties.items():
+                logger.info(f"  {key}: {value}")
+            
+            # Transcribe audio
+            transcription = transcribe_audio(saved_file_path)
+            logger.info(f" Transcription: {transcription}")
+            
+            return jsonify({
+                'transcription': transcription,
+                'language': 'he',
+                'confidence': 0.85
+            })
         
-        # Transcribe audio
-        transcription = transcribe_audio(saved_file_path)
-        logger.info(f"📝 Transcription: {transcription}")
-        
-        return jsonify({
-            'transcription': transcription,
-            'language': 'he',
-            'confidence': 0.85
-        })
+        finally:
+            # Always attempt to remove the temporary file
+            try:
+                os.unlink(saved_file_path)
+                logger.info(f" Deleted temporary file: {saved_file_path}")
+            except Exception as cleanup_error:
+                logger.error(f" Temporary File Cleanup Error: {cleanup_error}")
     
     except ValueError as ve:
         # Handle specific audio processing errors
-        logger.error(f"❌ Audio Processing Error: {ve}")
+        logger.error(f" Audio Processing Error: {ve}")
         logger.error(traceback.format_exc())
         return jsonify({
             'error': str(ve),
@@ -515,12 +516,6 @@ def transcribe():
                 'content_type': audio_file.content_type
             }
         }), 400
-    
-    finally:
-        # Clean up uploaded file
-        if os.path.exists(saved_file_path):
-            os.unlink(saved_file_path)
-            logger.info(f"🗑️ Deleted temporary file: {saved_file_path}")
 
 @app.route('/')
 def serve_client():
