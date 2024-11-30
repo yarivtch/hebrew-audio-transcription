@@ -3,7 +3,7 @@ services:
     name: hebrew-audio-transcription
     env: python
     plan: free
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pwd && ls -la && pip install -r requirements.txt
     startCommand: gunicorn --bind 0.0.0.0:$PORT server.server:app -w 1 --threads 2 --timeout 300
     envVars:
       - key: PYTHON_VERSION
