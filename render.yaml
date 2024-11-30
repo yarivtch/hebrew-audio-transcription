@@ -4,14 +4,16 @@ services:
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --bind 0.0.0.0:$PORT server.server:app -w 1 --threads 2 --timeout 120
+    startCommand: gunicorn --bind 0.0.0.0:$PORT server.server:app -w 1 --threads 2 --timeout 300
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.7
       - key: PYTHONUNBUFFERED
-        value: 1
+        value: "1"
       - key: FLASK_ENV
         value: production
+      - key: KMP_DUPLICATE_LIB_OK
+        value: "TRUE"
     autoDeploy: true
     healthCheckPath: /
     disk:
