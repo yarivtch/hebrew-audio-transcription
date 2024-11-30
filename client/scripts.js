@@ -14,7 +14,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (this.files && this.files.length > 0) {
             const file = this.files[0];
             selectedFile = file;
-            selectedFileDiv.textContent = `נבחר: ${file.name}`;
+            
+            // Create user message for file selection
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', 'user-message');
+            messageDiv.textContent = `נבחר קובץ: ${file.name}`;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            // Enable transcribe button
             transcribeBtn.disabled = false;
         }
     });
@@ -109,6 +117,13 @@ document.addEventListener('DOMContentLoaded', () => {
             transcribeBtn.disabled = true;
             loadingAnimation.style.display = 'block';
 
+            // Add system message for processing
+            const processingDiv = document.createElement('div');
+            processingDiv.classList.add('message', 'system-message');
+            processingDiv.textContent = 'מעבד את הקובץ...';
+            chatMessages.appendChild(processingDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
             // Convert audio to WAV format
             const wavFile = await convertToWav(selectedFile);
 
@@ -127,6 +142,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const data = await response.json();
+
+            // Remove processing message
+            chatMessages.removeChild(processingDiv);
 
             // Add transcription to chat
             const messageDiv = document.createElement('div');
