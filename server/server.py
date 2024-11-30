@@ -7,7 +7,13 @@ import io
 import wave
 
 # Set OpenMP environment variable to avoid conflicts
-os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+if 'KMP_DUPLICATE_LIB_OK' not in os.environ:
+    os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+    logger = logging.getLogger(__name__)
+    logger.info("Set KMP_DUPLICATE_LIB_OK to TRUE")
+else:
+    logger = logging.getLogger(__name__)
+    logger.info(f"KMP_DUPLICATE_LIB_OK already set to: {os.environ['KMP_DUPLICATE_LIB_OK']}")
 
 # Third-party library imports
 import numpy as np
