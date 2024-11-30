@@ -23,9 +23,6 @@ pip install --upgrade pip
 # Install dependencies
 pip install -r requirements.txt
 
-# Create uploads directory if not exists
-mkdir -p server/uploads
-
 # Start the server
 echo "Starting Hebrew Transcription Server..."
 python server/server.py &

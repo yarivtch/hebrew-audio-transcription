@@ -16,8 +16,4 @@ services:
         value: "TRUE"
     autoDeploy: true
     healthCheckPath: /
-    disk:
-      name: uploads
-      mountPath: /opt/render/project/uploads
-      sizeGB: 1
     maxRunTime: 600  # 10 minutes max runtime
