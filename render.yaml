@@ -1,19 +1,23 @@
 services:
   - type: web
-    name: hebrew-audio-transcription
-    env: python
+    name: hebrew-transcription
+    runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 300 --chdir server server:app
+    startCommand: gunicorn server:app
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.9.7
+      - key: TIMEOUT
+        value: 600  # 10 minutes
+      - key: WEB_CONCURRENCY
+        value: 1
       - key: PYTHONUNBUFFERED
-        value: "1"
-      - key: FLASK_ENV
-        value: production
-      - key: KMP_DUPLICATE_LIB_OK
-        value: "TRUE"
-    autoDeploy: true
+        value: 1
+    region: oregon
+    branch: main
     healthCheckPath: /
+    disk:
+      name: whisper-model-cache
+      mountPath: /tmp/whisper_model_cache
+      sizeGB: 10
+    autoDeploy: true
     maxRunTime: 600  # 10 minutes max runtime
