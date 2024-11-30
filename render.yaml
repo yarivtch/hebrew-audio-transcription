@@ -4,7 +4,7 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn server:app
+    startCommand: gunicorn --bind 0.0.0.0:$PORT server:app
     envVars:
       - key: TIMEOUT
         value: 600  # 10 minutes
@@ -12,6 +12,11 @@ services:
         value: 1
       - key: PYTHONUNBUFFERED
         value: 1
+      - key: PORT
+        fromService:
+          type: web
+          name: hebrew-transcription
+          property: port
     region: oregon
     branch: main
     healthCheckPath: /
