@@ -128,8 +128,7 @@ def transcribe():
                 segments, info = model.transcribe(
                     audio_data, 
                     language='he', 
-                    beam_size=5,
-                    log_prob_threshold=-1.0,
+                    beam_size=5, 
                     no_speech_threshold=0.6
                 )
                 
@@ -137,29 +136,34 @@ def transcribe():
                 transcription = ' '.join(segment.text for segment in segments)
                 
                 logger.info(f"Transcription completed. Length: {len(transcription)} characters")
-                logger.info(f"Detected language: {info.language}")
-                logger.info(f"Language probability: {info.language_probability}")
                 
+                # Return JSON response
                 return jsonify({
                     'transcription': transcription.strip(),
                     'language': 'he',
-                    'confidence': info.language_probability
+                    'confidence': float(info.language_probability)
                 })
             
             except Exception as transcribe_error:
-                logger.error(f"Transcription error: {str(transcribe_error)}")
-                logger.error(traceback.format_exc())
-                return jsonify({'error': f'שגיאה בביצוע התמלול: {str(transcribe_error)}'}), 500
+                logger.error(f"Transcription error: {transcribe_error}")
+                return jsonify({
+                    'error': f'שגיאה בביצוע התמלול: {str(transcribe_error)}',
+                    'details': str(transcribe_error)
+                }), 500
         
-        except Exception as audio_error:
-            logger.error(f"Audio Processing Error: {str(audio_error)}")
-            logger.error(traceback.format_exc())
-            return jsonify({'error': f'שגיאה בעיבוד קובץ האודיו: {str(audio_error)}'}), 400
+        except Exception as file_error:
+            logger.error(f"File processing error: {file_error}")
+            return jsonify({
+                'error': f'שגיאה בעיבוד הקובץ: {str(file_error)}',
+                'details': str(file_error)
+            }), 400
     
-    except Exception as e:
-        logger.error(f"Unexpected Error: {str(e)}")
-        logger.error(traceback.format_exc())
-        return jsonify({'error': str(e)}), 500
+    except Exception as general_error:
+        logger.error(f"General transcription error: {general_error}")
+        return jsonify({
+            'error': f'שגיאה כללית: {str(general_error)}',
+            'details': str(general_error)
+        }), 500
 
 @app.route('/debug-static')
 def debug_static():
