@@ -180,9 +180,9 @@ function writeString(view, offset, string) {
     }
 }
 
-async function uploadFile(file) {
+async function uploadFile(audioFile) {
     const formData = new FormData();
-    formData.append('audio', file);
+    formData.append('file', audioFile);  // שים לב לשינוי מ-'audio' ל-'file' = new FormData();
 
     try {
         const response = await fetch(TRANSCRIPTION_ENDPOINT, {

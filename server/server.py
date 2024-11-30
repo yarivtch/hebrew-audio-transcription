@@ -87,92 +87,124 @@ def read_wav_file(file_buffer):
 @app.route('/transcribe', methods=['POST'])
 def transcribe():
     try:
-        # Log request details
-        logger.info(f"Request Content-Type: {request.content_type}")
-        logger.info(f"Files in request: {list(request.files.keys())}")
-        logger.info(f"Form data in request: {list(request.form.keys())}")
+        # Log incoming request details
+        logger.info(f"Transcription request received. Content type: {request.content_type}")
+        logger.info(f"Request headers: {dict(request.headers)}")
         
-        # Check if file was uploaded
-        if 'audio' not in request.files:
-            error_details = {
-                'error': 'לא סופק קובץ אודיו',
-                'details': {
-                    'content_type': request.content_type,
-                    'files_keys': list(request.files.keys()),
-                    'form_keys': list(request.form.keys())
-                }
-            }
-            logger.error(f"File upload error: {error_details}")
-            return jsonify(error_details), 400
+        # Check if file is present
+        if 'file' not in request.files:
+            logger.error("No file part in the request")
+            return jsonify({'error': 'לא נשלח קובץ אודיו'}), 400
         
-        audio_file = request.files['audio']
-        if not audio_file:
-            return jsonify({'error': 'קובץ אודיו ריק'}), 400
-        
-        # Read file content into memory
-        audio_content = audio_file.read()
-        audio_buffer = io.BytesIO(audio_content)
+        audio_file = request.files['file']
         
         # Log file details
-        logger.info(f"File Details:")
-        logger.info(f"  Content Type: {audio_file.content_type}")
-        logger.info(f"  Filename: {audio_file.filename}")
-        logger.info(f"  Size: {len(audio_content)} bytes")
+        logger.info(f"Received file: {audio_file.filename}")
+        logger.info(f"File content type: {audio_file.content_type}")
+        
+        # Validate file
+        if audio_file.filename == '':
+            logger.error("No selected file")
+            return jsonify({'error': 'לא נבחר קובץ'}), 400
         
         try:
-            # Read WAV file
+            # Read audio file
+            audio_buffer = io.BytesIO(audio_file.read())
             audio_data, channels, frame_rate = read_wav_file(audio_buffer)
             
-            # Log audio properties
-            logger.info(f"Audio Properties:")
-            logger.info(f"  Sample Rate: {frame_rate} Hz")
-            logger.info(f"  Channels: {channels}")
-            logger.info(f"  Data Shape: {audio_data.shape}")
+            # Log audio data details
+            logger.info(f"Audio data shape: {audio_data.shape}")
+            logger.info(f"Audio data dtype: {audio_data.dtype}")
+            logger.info(f"Audio data min/max: {audio_data.min()}, {audio_data.max()}")
             
-            # Get transcription model
+            # Load model
             model = get_whisper_model()
-            if not model:
-                return jsonify({'error': 'מודל התמלול לא נטען בהצלחה'}), 500
+            if model is None:
+                logger.error("Failed to load Whisper model")
+                return jsonify({'error': 'שגיאה בטעינת מודל התמלול'}), 500
             
             # Perform transcription
-            segments, info = model.transcribe(
-                audio_data,
-                language='he',  # Specify Hebrew
-                beam_size=5,    # Improved accuracy
-                task='transcribe'
-            )
+            try:
+                segments, info = model.transcribe(
+                    audio_data, 
+                    language='he', 
+                    beam_size=5,
+                    log_prob_threshold=-1.0,
+                    no_speech_threshold=0.6
+                )
+                
+                # Combine segments
+                transcription = ' '.join(segment.text for segment in segments)
+                
+                logger.info(f"Transcription completed. Length: {len(transcription)} characters")
+                logger.info(f"Detected language: {info.language}")
+                logger.info(f"Language probability: {info.language_probability}")
+                
+                return jsonify({
+                    'transcription': transcription.strip(),
+                    'language': 'he',
+                    'confidence': info.language_probability
+                })
             
-            # Process segments
-            transcription = ""
-            for segment in segments:
-                transcription += segment.text + " "
-            
-            # Log transcription results
-            logger.info(f"Transcription completed. Length: {len(transcription)} characters")
-            
-            return jsonify({
-                'transcription': transcription.strip(),
-                'language': 'he',
-                'confidence': 0.85
-            })
-            
-        except Exception as e:
-            logger.error(f"Audio Processing Error: {str(e)}")
+            except Exception as transcribe_error:
+                logger.error(f"Transcription error: {str(transcribe_error)}")
+                logger.error(traceback.format_exc())
+                return jsonify({'error': f'שגיאה בביצוע התמלול: {str(transcribe_error)}'}), 500
+        
+        except Exception as audio_error:
+            logger.error(f"Audio Processing Error: {str(audio_error)}")
             logger.error(traceback.format_exc())
-            return jsonify({'error': f'שגיאה בעיבוד קובץ האודיו: {str(e)}'}), 400
-            
+            return jsonify({'error': f'שגיאה בעיבוד קובץ האודיו: {str(audio_error)}'}), 400
+    
     except Exception as e:
         logger.error(f"Unexpected Error: {str(e)}")
         logger.error(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
+@app.route('/debug-static')
+def debug_static():
+    try:
+        logger.info(f"Static folder: {app.static_folder}")
+        logger.info(f"Static files: {os.listdir(app.static_folder)}")
+        return jsonify({
+            'static_folder': app.static_folder,
+            'static_files': os.listdir(app.static_folder)
+        })
+    except Exception as e:
+        logger.error(f"Debug static error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.errorhandler(Exception)
+def handle_global_error(e):
+    logger.error(f"Global error handler caught: {str(e)}")
+    logger.error(traceback.format_exc())
+    return jsonify({
+        'error': 'שגיאה לא צפויה במערכת',
+        'details': str(e)
+    }), 500
+
 @app.route('/')
 def serve_client():
-    return send_from_directory(app.static_folder, 'index.html')
+    try:
+        logger.info(f"Serving index.html from: {app.static_folder}")
+        return send_from_directory(app.static_folder, 'index.html')
+    except Exception as e:
+        logger.error(f"Error serving index.html: {str(e)}")
+        return jsonify({'error': f'שגיאה בטעינת דף ראשי: {str(e)}'}), 500
 
 @app.route('/<path:path>')
 def serve_static(path):
-    return send_from_directory(app.static_folder, path)
+    try:
+        logger.info(f"Requested static file: {path}")
+        full_path = os.path.join(app.static_folder, path)
+        logger.info(f"Full path: {full_path}")
+        if not os.path.exists(full_path):
+            logger.error(f"File not found: {full_path}")
+            return jsonify({'error': f'קובץ לא נמצא: {path}'}), 404
+        return send_from_directory(app.static_folder, path)
+    except Exception as e:
+        logger.error(f"Error serving static file {path}: {str(e)}")
+        return jsonify({'error': f'שגיאה בטעינת קובץ: {str(e)}'}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5002))
