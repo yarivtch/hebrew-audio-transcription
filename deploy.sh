@@ -21,7 +21,7 @@ source venv/bin/activate
 pip install --upgrade pip
 
 # Install dependencies
-pip install -r server/requirements.txt
+pip install -r requirements.txt
 
 # Create uploads directory if not exists
 mkdir -p server/uploads
