@@ -3,29 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>מערכת תמלול אודיו</title>
+    <title>תמלול אודיו חכם</title>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
-        <h1>מערכת תמלול אודיו</h1>
-        <div id="drop-area">
-            <form class="my-form">
-                <p>גרור קובץ אודיו לכאן או לחץ לבחירת קובץ</p>
-                <input type="file" id="fileElem" accept="audio/*">
-                <label class="button" for="fileElem">בחר קובץ</label>
-            </form>
+    <div class="chat-container">
+        <div class="chat-header">
+            <span class="material-icons">record_voice_over</span>
+            <h1>תמלול אודיו חכם</h1>
         </div>
-        <div id="selected-file"></div>
-        <div id="transcribe-container">
-            <button id="transcribe-btn">תמלל</button>
-            <div id="loading-animation" class="lds-ellipsis" style="display: none;">
-                <div></div><div></div><div></div><div></div>
+        
+        <div class="chat-messages" id="chat-messages">
+            <div class="message system-message">
+                <div class="message-content">
+                    ברוכים הבאים למערכת התמלול החכמה! 
+                    <br>אנא העלו קובץ אודיו לתמלול.
+                </div>
             </div>
         </div>
-        <div id="transcription-area" class="transcription-area">
-            <h2>תוצאת התמלול:</h2>
-            <p id="transcription-text">אין תמלול עדיין</p>
+
+        <div id="selected-file" class="selected-file"></div>
+        
+        <div class="chat-input-area">
+            <input type="file" id="fileElem" accept="audio/*" style="display: none;">
+            <button class="upload-btn" onclick="document.getElementById('fileElem').click()">
+                <span class="material-icons">attach_file</span>
+                העלאת קובץ
+            </button>
+            <button id="transcribe-btn" class="transcribe-btn" disabled>
+                <span class="material-icons">translate</span>
+                תמלל
+            </button>
+        </div>
+
+        <div id="loading-animation" class="loading-animation">
+            <div class="loading-dots">
+                <div></div><div></div><div></div>
+            </div>
+            <div class="loading-text">מתמלל...</div>
         </div>
     </div>
     <script src="scripts.js"></script>
