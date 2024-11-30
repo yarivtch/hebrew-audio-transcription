@@ -28,7 +28,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Initialize Flask app
-app = Flask(__name__, static_folder='../client', static_url_path='/')
+base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+client_dir = os.path.join(base_dir, 'client')
+app = Flask(__name__, static_folder=client_dir, static_url_path='/')
 CORS(app)
 
 # Global model initialization with lazy loading
