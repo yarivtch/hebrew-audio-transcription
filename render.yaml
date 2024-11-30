@@ -3,7 +3,7 @@ services:
     name: hebrew-audio-transcription
     env: python
     plan: free
-    buildCommand: pwd && ls -la && pip install -r requirements.txt
+    buildCommand: pip install flask==2.3.2 faster-whisper==0.9.0 numpy==1.24.3 werkzeug==2.3.6 torch==2.0.1 transformers==4.30.2 setuptools==68.0.0 scipy==1.11.4 Flask-CORS==4.0.0 gunicorn==21.2.0 ctranslate2==3.24.0 huggingface-hub==0.17.3 onnxruntime==1.16.3
     startCommand: gunicorn --bind 0.0.0.0:$PORT server.server:app -w 1 --threads 2 --timeout 300
     envVars:
       - key: PYTHON_VERSION
